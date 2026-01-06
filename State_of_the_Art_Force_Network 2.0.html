@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>State of the Art: Force-Directed Network Graph</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      background: #000; 
+      color: #e5e5e5; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.light-mode {
+      background: #ffffff;
+      color: #1a1a1a;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .mode-toggle {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .mode-toggle:hover {
+      background: #2a2a2a;
+      border-color: #444;
+    }
+    body.light-mode .mode-toggle {
+      background: #f0f0f0;
+      border-color: #ccc;
+    }
+    body.light-mode .mode-toggle:hover {
+      background: #e0e0e0;
+    }
+    .mode-icon {
+      font-size: 18px;
+    }
+    .controls {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 100;
+      background: rgba(5,5,5,0.95);
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 280px;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    body.light-mode .controls {
+      background: rgba(255,255,255,0.95);
+      border-color: #ddd;
+    }
+    .controls h1 {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    body.light-mode .controls h1 {
+      color: #1a1a1a;
+    }
+    .controls .subtitle {
+      font-size: 11px;
+      color: #555;
+      margin-bottom: 0;
+    }
+    body.light-mode .controls .subtitle {
+      color: #666;
+    }
+    .control-group {
+      margin-bottom: 12px;
+    }
+    .control-group label {
+      display: block;
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    body.light-mode .control-group label {
+      color: #555;
+    }
+    select {
+      width: 100%;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      border: 1px solid #222;
+      border-radius: 4px;
+      padding: 8px;
+      font-size: 12px;
+    }
+    select:focus { outline: none; border-color: #444; }
+    body.light-mode select {
+      background: #f5f5f5;
+      color: #1a1a1a;
+      border-color: #ccc;
+    }
+    body.light-mode select:focus {
+      border-color: #999;
+    }
+    
+    .slider-group {
+      margin-bottom: 14px;
+    }
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    body.light-mode .slider-group label {
+      color: #555;
+    }
+    .slider-group label span {
+      color: #999;
+      font-weight: 500;
+    }
+    body.light-mode .slider-group label span {
+      color: #333;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: #1a1a1a;
+      border-radius: 3px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #444;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid #666;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #555;
+    }
+    body.light-mode input[type="range"] {
+      background: #ddd;
+    }
+    body.light-mode input[type="range"]::-webkit-slider-thumb {
+      background: #888;
+      border-color: #666;
+    }
+    
+    .legend {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #1a1a1a;
+    }
+    body.light-mode .legend {
+      border-top-color: #ddd;
+    }
+    .legend-title {
+      font-size: 10px;
+      color: #555;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    body.light-mode .legend-title {
+      color: #666;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 11px;
+      color: #777;
+    }
+    body.light-mode .legend-item {
+      color: #555;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .legend-dot.system {
+      border: 2px solid #fff;
+    }
+    .legend-dot.capability {
+      border: 2px solid #000;
+      box-shadow: 0 0 0 1px #333;
+    }
+    .border-legend {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #1a1a1a;
+    }
+    body.light-mode .border-legend {
+      border-top-color: #ddd;
+    }
+    .border-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #888;
+    }
+    body.light-mode .border-legend-item {
+      color: #555;
+    }
+    .border-sample {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #666;
+    }
+    .border-sample.white-border {
+      border: 3px solid #fff;
+    }
+    body.light-mode .border-sample.white-border {
+      border-color: #000;
+    }
+    .border-sample.black-border {
+      border: 3px solid #000;
+      box-shadow: 0 0 0 1px #444;
+    }
+    body.light-mode .border-sample.black-border {
+      border-color: #fff;
+      box-shadow: 0 0 0 1px #aaa;
+    }
+    .info-panel {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      z-index: 100;
+      background: rgba(5,5,5,0.95);
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 450px;
+      max-height: 280px;
+      overflow-y: auto;
+      font-size: 12px;
+      display: none;
+    }
+    body.light-mode .info-panel {
+      background: rgba(255,255,255,0.95);
+      border-color: #ddd;
+    }
+    .info-panel.visible { display: block; }
+    .info-panel h3 {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .info-panel .type-label {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .info-panel .description {
+      font-size: 11px;
+      color: #aaa;
+      line-height: 1.5;
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 4px;
+      border-left: 2px solid #444;
+    }
+    body.light-mode .info-panel .description {
+      color: #555;
+      background: rgba(0,0,0,0.03);
+      border-left-color: #ccc;
+    }
+    .info-panel .connections {
+      color: #777;
+      line-height: 1.6;
+      font-size: 11px;
+    }
+    body.light-mode .info-panel .connections {
+      color: #555;
+    }
+    .stats {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 100;
+      background: rgba(5,5,5,0.95);
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 11px;
+      color: #555;
+    }
+    body.light-mode .stats {
+      background: rgba(255,255,255,0.95);
+      border-color: #ddd;
+      color: #777;
+    }
+    .stats span { color: #999; }
+    body.light-mode .stats span { color: #333; }
+    #graph {
+      width: 100vw;
+      height: 100vh;
+    }
+    .node {
+      cursor: pointer;
+    }
+    .node text {
+      fill: #fff;
+      pointer-events: none;
+      font-weight: 500;
+      text-anchor: middle;
+    }
+    body.light-mode .node text {
+      fill: #000;
+    }
+    .node.dimmed {
+      opacity: 0.08;
+    }
+    .link {
+      stroke: #444;
+      stroke-opacity: 0.25;
+    }
+    body.light-mode .link {
+      stroke: #999;
+      stroke-opacity: 0.35;
+    }
+    .link.highlighted {
+      stroke-opacity: 0.9;
+      stroke-width: 2.5px !important;
+    }
+    .link.dimmed {
+      stroke-opacity: 0.03;
+    }
+    body.light-mode .link.dimmed {
+      stroke-opacity: 0.08;
+    }
+    .link.full { stroke: #22c55e; }
+    .link.partial { stroke: #eab308; }
+    .instructions {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      z-index: 100;
+      background: rgba(5,5,5,0.95);
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 10px;
+      color: #444;
+    }
+    .insights-panel {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      z-index: 100;
+      background: rgba(5,5,5,0.97);
+      border: 1px solid #333;
+      border-radius: 10px;
+      width: 420px;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    body.light-mode .insights-panel {
+      background: rgba(255,255,255,0.97);
+      border-color: #ddd;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .insights-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      cursor: pointer;
+      border-bottom: 1px solid #333;
+    }
+    body.light-mode .insights-header {
+      background: linear-gradient(135deg, #e8eaf0 0%, #d5dbe8 100%);
+      border-bottom-color: #ccc;
+    }
+    .insights-header:hover {
+      background: linear-gradient(135deg, #1f1f35 0%, #1a2744 100%);
+    }
+    body.light-mode .insights-header:hover {
+      background: linear-gradient(135deg, #dde0e8 0%, #cad2e2 100%);
+    }
+    .insights-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+    }
+    body.light-mode .insights-header h2 {
+      color: #1a1a1a;
+    }
+    .toggle-icon {
+      color: #666;
+      font-size: 12px;
+      transition: transform 0.3s;
+    }
+    .toggle-icon.collapsed {
+      transform: rotate(-90deg);
+    }
+    .insights-content {
+      padding: 16px 18px;
+      overflow-y: auto;
+      max-height: calc(85vh - 50px);
+      transition: max-height 0.3s ease;
+    }
+    .insights-content.collapsed {
+      max-height: 0;
+      padding: 0 18px;
+    }
+    .insight-section {
+      margin-bottom: 20px;
+    }
+    .insight-section:last-child {
+      margin-bottom: 0;
+    }
+    .insight-section h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #666;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #222;
+    }
+    body.light-mode .insight-section h3 {
+      color: #555;
+      border-bottom-color: #ddd;
+    }
+    .insight-item {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 6px;
+      border-left: 3px solid #333;
+    }
+    body.light-mode .insight-item {
+      background: rgba(0,0,0,0.02);
+      border-left-color: #ccc;
+    }
+    .insight-item:hover {
+      background: rgba(255,255,255,0.04);
+    }
+    body.light-mode .insight-item:hover {
+      background: rgba(0,0,0,0.04);
+    }
+    .insight-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      width: 24px;
+      text-align: center;
+    }
+    .insight-icon.color-commercial { color: #3B82F6; }
+    .insight-icon.color-university { color: #EF4444; }
+    .insight-icon.color-ai { color: #F97316; }
+    .insight-item strong {
+      display: block;
+      font-size: 12px;
+      color: #ddd;
+      margin-bottom: 4px;
+    }
+    body.light-mode .insight-item strong {
+      color: #222;
+    }
+    .insight-item p {
+      font-size: 11px;
+      color: #888;
+      line-height: 1.5;
+      margin: 0;
+    }
+    body.light-mode .insight-item p {
+      color: #555;
+    }
+    .conclusion-box {
+      background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(16,185,129,0.1) 100%);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    body.light-mode .conclusion-box {
+      background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(16,185,129,0.08) 100%);
+      border-color: rgba(59,130,246,0.4);
+    }
+    .conclusion-box p {
+      font-size: 11px;
+      color: #aaa;
+      line-height: 1.6;
+      margin: 0 0 10px 0;
+    }
+    body.light-mode .conclusion-box p {
+      color: #444;
+    }
+    .conclusion-box ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    .conclusion-box li {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    body.light-mode .conclusion-box li {
+      color: #555;
+    }
+    .conclusion-box .highlight {
+      color: #4ade80;
+      font-weight: 500;
+      margin-top: 12px;
+      margin-bottom: 0;
+      padding-top: 10px;
+      border-top: 1px solid rgba(74,222,128,0.2);
+    }
+    body.light-mode .conclusion-box .highlight {
+      color: #16a34a;
+      border-top-color: rgba(22,163,74,0.3);
+    }
+    .nav-hint {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #222;
+      font-size: 10px;
+      color: #555;
+      text-align: center;
+    }
+    body.light-mode .nav-hint {
+      border-top-color: #ddd;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div class="header-row">
+      <div>
+        <h1>Network Graph</h1>
+        <p class="subtitle">Building Compliance Systems Analysis</p>
+      </div>
+      <button class="mode-toggle" id="modeToggle" onclick="toggleMode()">
+        <span class="mode-icon">☀️</span>
+      </button>
+    </div>
+    
+    <div class="control-group">
+      <label>View Mode</label>
+      <select id="viewMode">
+        <option value="all">All: Systems ↔ Capabilities</option>
+        <option value="systems">Systems Only (Similarity)</option>
+        <option value="capabilities">Capabilities Only (Co-occurrence)</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>Filter Systems</label>
+      <select id="categoryFilter">
+        <option value="All">All Categories</option>
+        <option value="Commercial">Commercial</option>
+        <option value="Government">Government</option>
+        <option value="EU Research">EU Research</option>
+        <option value="University">University</option>
+        <option value="Open Source">Open Source</option>
+        <option value="AI/Emerging">AI/Emerging</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>Filter Capabilities</label>
+      <select id="capGroupFilter">
+        <option value="All">All Groups</option>
+        <option value="Data Input">Data Input</option>
+        <option value="Rule Definition">Rule Definition</option>
+        <option value="Checking Types">Checking Types</option>
+        <option value="AI/ML">AI/ML</option>
+        <option value="Semantic">Semantic</option>
+        <option value="Output">Output</option>
+        <option value="Integration">Integration</option>
+        <option value="Workflow">Workflow</option>
+        <option value="Standards">Standards</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Min Score</label>
+      <select id="minScore">
+        <option value="0.5">0.5+ (Partial)</option>
+        <option value="1">1.0 (Full only)</option>
+      </select>
+    </div>
+
+    <div class="slider-group">
+      <label>Category Clustering <span id="clusterVal">0.08</span></label>
+      <input type="range" id="clusterStrength" min="0" max="0.5" step="0.01" value="0.08">
+    </div>
+
+    <div class="slider-group">
+      <label>Link Pull Strength <span id="linkVal">0.050</span></label>
+      <input type="range" id="linkStrength" min="0" max="0.3" step="0.005" value="0.05">
+    </div>
+
+    <div class="border-legend">
+      <div class="legend-title">Node Types (Border)</div>
+      <div class="border-legend-item">
+        <div class="border-sample white-border"></div>
+        <span id="systemBorderLabel">System (White border)</span>
+      </div>
+      <div class="border-legend-item">
+        <div class="border-sample black-border"></div>
+        <span id="capBorderLabel">Capability (Black border)</span>
+      </div>
+    </div>
+    
+    <div class="legend" id="systemLegend">
+      <div class="legend-title">System Categories</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#3B82F6"></span>Commercial</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#10B981"></span>Government</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#F59E0B"></span>EU Research</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#EF4444"></span>University</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#8B5CF6"></span>Open Source</div>
+      <div class="legend-item"><span class="legend-dot system" style="background:#F97316"></span>AI/Emerging</div>
+    </div>
+    
+    <div class="legend" id="capLegend" style="display:none;">
+      <div class="legend-title">Capability Groups</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#06B6D4"></span>Data Input</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#8B5CF6"></span>Rule Definition</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#EC4899"></span>Checking Types</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#F59E0B"></span>AI/ML</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#10B981"></span>Semantic</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#3B82F6"></span>Output</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#6366F1"></span>Integration</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#14B8A6"></span>Workflow</div>
+      <div class="legend-item"><span class="legend-dot capability" style="background:#78716C"></span>Standards</div>
+    </div>
+  </div>
+  
+  <div class="stats" id="stats">
+    <span id="nodeCount">0</span> nodes • <span id="linkCount">0</span> connections
+  </div>
+  
+  <div class="info-panel" id="infoPanel">
+    <h3 id="infoTitle"></h3>
+    <div class="type-label" id="infoType"></div>
+    <div class="description" id="infoDesc"></div>
+    <div class="connections" id="infoConnections"></div>
+  </div>
+  
+  <div class="insights-panel" id="insightsPanel">
+    <div class="insights-header" onclick="toggleInsights()">
+      <h2>Inference & Conclusions</h2>
+      <span class="toggle-icon" id="toggleIcon">▼</span>
+    </div>
+    <div class="insights-content" id="insightsContent">
+      <div class="insight-section">
+        <h3>Key Findings</h3>
+        <div class="insight-item">
+          <span class="insight-icon">🔍</span>
+          <div>
+            <strong>EU Research leads in comprehensiveness</strong>
+            <p>ACCORD, CHEK, and DigiChecks demonstrate the highest capability coverage (40+ capabilities), integrating AI/ML, semantic technologies, and multi-jurisdiction support that commercial tools lack.</p>
+          </div>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon">⚠️</span>
+          <div>
+            <strong>Critical gap: Automated Rule Generation</strong>
+            <p>Only 12% of systems support LLM/NLP-based rule extraction. Most rely on manual rule encoding—the primary bottleneck causing 6+ month permit delays and $26K-35K costs per jurisdiction.</p>
+          </div>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon">🏛️</span>
+          <div>
+            <strong>Government systems prioritize workflow over AI</strong>
+            <p>Platforms like CORENET X and KBIM excel at official portal integration and multi-agency coordination but show minimal AI/ML adoption, creating opportunity for hybrid solutions.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="insight-section">
+        <h3>Cluster Patterns</h3>
+        <div class="insight-item">
+          <span class="insight-icon color-commercial">●</span>
+          <div>
+            <strong>Commercial cluster</strong>
+            <p>Strongest in geometric checking, BIM integration, and visual outputs. Weak in semantic technologies and automated rule generation.</p>
+          </div>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon color-university">●</span>
+          <div>
+            <strong>University cluster</strong>
+            <p>Pioneering semantic web, knowledge graphs, and NLP approaches. Limited real-world deployment and workflow integration.</p>
+          </div>
+        </div>
+        <div class="insight-item">
+          <span class="insight-icon color-ai">●</span>
+          <div>
+            <strong>AI/Emerging cluster</strong>
+            <p>Focus on generative design, computer vision, and predictive analytics. Gap in standards compliance (IDS, MVD) and formal rule definition.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="insight-section">
+        <h3>Research Opportunity</h3>
+        <div class="conclusion-box">
+          <p><strong>The "Policy-to-Algorithm" thesis addresses the most critical bottleneck:</strong> bridging the gap between regulatory text and machine-readable rules using LLMs. This capability sits at the intersection of:</p>
+          <ul>
+            <li>University research (NLP/semantic expertise)</li>
+            <li>Government needs (multi-jurisdiction, official workflows)</li>
+            <li>Commercial demand (automation, scalability)</li>
+          </ul>
+          <p class="highlight">No existing system fully automates regulation → JSON rule conversion with high accuracy across jurisdictions.</p>
+        </div>
+      </div>
+      <div class="nav-hint">
+        💡 Drag nodes • Hover to highlight • Scroll to zoom • Pan to move
+      </div>
+    </div>
+  </div>
+  
+  <svg id="graph"></svg>
+
+  <script>
+    // Toggle insights panel
+    function toggleInsights() {
+      var content = document.getElementById("insightsContent");
+      var icon = document.getElementById("toggleIcon");
+      content.classList.toggle("collapsed");
+      icon.classList.toggle("collapsed");
+    }
+
+    // Toggle light/dark mode
+    function toggleMode() {
+      var body = document.body;
+      var icon = document.querySelector(".mode-icon");
+      body.classList.toggle("light-mode");
+      
+      var isLight = body.classList.contains("light-mode");
+      icon.textContent = isLight ? "🌙" : "☀️";
+      
+      // Update legend labels
+      document.getElementById("systemBorderLabel").textContent = isLight ? "System (Black border)" : "System (White border)";
+      document.getElementById("capBorderLabel").textContent = isLight ? "Capability (White border)" : "Capability (Black border)";
+      
+      // Update node strokes for visibility
+      updateNodeStrokes();
+    }
+
+    function updateNodeStrokes() {
+      var isLight = document.body.classList.contains("light-mode");
+      nodeG.selectAll("circle")
+        .attr("stroke", function(d) { 
+          if (d.type === "system") {
+            return isLight ? "#000000" : "#ffffff";
+          } else {
+            return isLight ? "#ffffff" : "#000000";
+          }
+        });
+    }
+
+    // Data
+    var systemsData = [
+      { id: "S01", name: "Solibri", category: "Commercial", desc: "Industry-leading BIM quality assurance and code checking software with extensive pre-built rulesets.", scores: [1,0.5,0,0,1,1,1,1,0.5,0.5,0.5,0.5,1,1,1,1,1,1,1,0.5,0.5,0,0,0,0,0,0,0,0,0,1,1,1,1,0.5,0.5,1,1,1,0.5,1,1,1,0,0,0,1,1,1,1] },
+      { id: "S02", name: "Autodesk MC", category: "Commercial", desc: "Model Checker integrated within Autodesk ecosystem for Revit-based compliance validation.", scores: [0,1,0,0,0,0.5,1,1,0,0.5,0,0,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,1,0,0,1,1,0.5,1,0,0,0,0,0,0,0.5] },
+      { id: "S03", name: "Navisworks", category: "Commercial", desc: "3D design review and clash detection tool widely used for construction coordination.", scores: [0.5,1,0.5,0,1,0.5,1,0.5,0.5,0,0,0,1,0.5,0.5,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0.5,0,0.5,0,1,1,1,0,0,0,0,0,0,0.5] },
+      { id: "S04", name: "Bentley", category: "Commercial", desc: "Infrastructure-focused BIM platform with OpenBuildings and ProjectWise integration.", scores: [1,1,0.5,0.5,1,0.5,0.5,0.5,0.5,0,0.5,0,1,1,1,1,0.5,0.5,0.5,1,1,0.5,0,0,0,0,0,0,0.5,0,1,1,1,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0.5,0.5,0,0,0,0.5,0.5,1,1] },
+      { id: "S05", name: "ArchiCAD", category: "Commercial", desc: "Architect-centric BIM authoring tool with built-in model checking capabilities.", scores: [1,1,0,0,0.5,1,0.5,0.5,0,0,0,0,1,1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,1,0.5,0.5,1,0.5,0.5,1,0,0,0,0.5,0.5,0,0.5] },
+      { id: "S06", name: "Tekla", category: "Commercial", desc: "Structural BIM software with advanced detailing and fabrication-level checking.", scores: [1,1,0,0,1,0.5,0.5,0.5,0.5,0,0,0,1,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0.5,0,1,1,1,1,0,0,0,0.5,0.5,0.5,0.5,1,0.5,0,0,0,0.5,0.5,0.5,0.5] },
+      { id: "S07", name: "SMARTreview", category: "Commercial", desc: "Code compliance review platform focused on accessibility and life safety checks.", scores: [0,1,0,0,0,1,0.5,0.5,0,0.5,0.5,0.5,1,1,1,0,1,0.5,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,1,1,0.5,0,0.5,0,1,1,0,1,0,0,0,0] },
+      { id: "S08", name: "BIM Assure", category: "Commercial", desc: "Cloud-based BIM validation service for quality control and standards compliance.", scores: [1,1,0,0,1,0.5,1,0.5,0.5,0.5,0,0,1,1,1,0.5,0.5,0.5,0.5,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0.5,0.5,0,1,1,1,0.5,1,1,1,0,0,0.5,0,0,1,0.5] },
+      { id: "S09", name: "Verifi3D", category: "Commercial", desc: "Automated BIM checking platform with visual rule editing and clash detection.", scores: [1,1,0,0,1,0.5,1,1,0,0,0,0,1,1,1,1,0.5,0.5,0.5,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0.5,1,1,0.5,1,1,1,0,0,0.5,0,0,0,0.5] },
+      { id: "S10", name: "dRofus", category: "Commercial", desc: "Room and equipment data management with requirements validation capabilities.", scores: [1,1,0,0,0.5,0.5,1,0.5,0.5,0.5,0.5,0,0.5,1,1,0,0,0.5,0,0,0,0,0,0,0,0,0,0,0.5,0,1,1,0.5,0,0.5,0,1,1,1,0.5,0.5,0.5,0.5,0,0,0.5,0,0,1,1] },
+      { id: "S11", name: "CodeComply.AI", category: "Commercial", desc: "AI-powered code compliance platform using NLP to interpret building regulations.", scores: [0,0,1,0,0,1,0.5,0.5,0,1,1,1,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,0.5,1,1,0.5,0.5,0,0,0,0,1,1,0.5,0,1,0.5,0,1,1,0,1,0,1,0.5,0,1,0,0,0,0] },
+      { id: "S12", name: "UpCodes", category: "Commercial", desc: "Digital building code platform with AI-assisted code search and compliance tools.", scores: [0,0.5,0,0,0,1,0,0,0,1,1,1,0.5,0.5,0,0,0.5,0.5,0.5,0.5,0,0.5,1,0,0.5,0,0,0,0,0,0.5,1,0,0,1,0,0.5,1,1,0,0,0,1,0,0,0.5,0,0,0,0] },
+      { id: "S13", name: "Archistar", category: "Commercial", desc: "Generative design platform with zoning compliance and feasibility analysis.", scores: [0.5,0.5,1,1,0,1,0.5,0.5,0,0.5,0.5,0.5,1,0.5,0.5,0,0.5,0.5,0.5,0.5,0,1,0.5,1,0.5,0.5,0.5,0,0,0,1,1,1,0,0.5,0.5,0,1,1,0.5,1,0,1,1,0,1,0,0,0,0] },
+      { id: "S14", name: "icheck", category: "Commercial", desc: "Automated plan review software for permit expediting and code compliance.", scores: [0,1,0,0,0,1,0,0,0,0.5,0,0,1,1,1,0,0.5,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0] },
+      { id: "S15", name: "CORENET X", category: "Government", desc: "Singapore's next-gen e-submission system with automated BIM-based plan checking.", scores: [1,0,0.5,0.5,1,1,0,0,0,1,0,1,1,1,1,0.5,1,1,1,0.5,0.5,1,0,0,0,0,0,0.5,0.5,0,1,1,1,1,1,1,0,1,1,0,1,0.5,1,1,1,1,1,1,0.5,1] },
+      { id: "S16", name: "KBIM", category: "Government", desc: "South Korea's national BIM-based building permit automation system.", scores: [1,0,0,0.5,1,1,0.5,0.5,0.5,1,0,1,1,1,1,0.5,1,1,1,0.5,0.5,0.5,0,0,0.5,0,0,0.5,0,0,1,1,1,1,1,1,0,1,0.5,0,1,0,1,1,1,1,0.5,0.5,0,0.5] },
+      { id: "S17", name: "RAVA3Pro", category: "Government", desc: "Finnish automated building regulation checking system using IFC models.", scores: [1,0,0.5,0.5,1,1,0.5,0,0,1,0,1,1,1,1,0.5,1,1,1,0.5,0,0.5,0,0,0,0,0,0.5,0,0.5,1,1,1,0.5,1,1,0,1,0.5,0,1,0,1,1,0.5,1,0.5,0.5,0,0.5] },
+      { id: "S18", name: "HK BD Tools", category: "Government", desc: "Hong Kong Buildings Department digital tools for regulatory compliance.", scores: [1,0,0.5,0,0.5,1,0,0,0,0.5,0,0.5,1,1,1,0,0.5,0.5,1,0,0.5,0.5,0,0,0,0,0,0,0,0,1,1,1,0.5,1,0.5,0,1,0.5,0,0.5,0,0.5,1,0.5,1,0,0,0,0.5] },
+      { id: "S19", name: "Norway", category: "Government", desc: "Norwegian digital building application platform with automated validation.", scores: [0.5,0,0.5,0,0,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0,0,0,0,0,0,0,0,1,1,0.5,0,0.5,0.5,0,1,1,0,0.5,0,1,1,0.5,1,0,0,0,0.5] },
+      { id: "S20", name: "Estonia", category: "Government", desc: "Estonian e-construction platform with BIM-based permit processing.", scores: [1,0,0.5,1,0.5,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0,0,0,0,0,0.5,0.5,0,1,1,1,0,0.5,0.5,0,1,0.5,0,0.5,0,1,1,0.5,1,0,0,0,0.5] },
+      { id: "S21", name: "Netherlands", category: "Government", desc: "Dutch digital permit system with BIM integration for regulatory checking.", scores: [0,0,1,1,0,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,1,0,0,0,0,0,0,0,0,1,1,1,0,0.5,0.5,0,1,0.5,0,0.5,0,0.5,1,1,1,0,0,0,0.5] },
+      { id: "S22", name: "Dubai BPS", category: "Government", desc: "Dubai Building Permit System with automated compliance checking.", scores: [0,0,1,0.5,0,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0.5,0,0,0,0,0,0,0,0,1,1,0.5,0,0.5,0.5,0,1,0.5,0,0.5,0,0.5,1,1,1,0,0,0,0] },
+      { id: "S23", name: "NYC DOB", category: "Government", desc: "New York City Department of Buildings digital plan examination tools.", scores: [0,0,1,0.5,0,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0.5,0.5,0,0,0,0,0,0,0,0,1,1,0.5,0,0.5,0.5,0,1,0.5,0,0.5,0,0.5,1,1,1,0,0,0,0.5] },
+      { id: "S24", name: "NSW Portal", category: "Government", desc: "New South Wales planning portal with digital development application processing.", scores: [0,0,1,1,0,0.5,0,0,0,0.5,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0.5,1,0,1,0,0,0,0,0,0,0,0,1,1,1,0,0.5,0.5,0,1,0.5,0,1,0,1,1,0.5,1,0,0,0,0.5] },
+      { id: "S25", name: "ACCORD", category: "EU Research", desc: "Horizon Europe project developing automated compliance checking ontologies and AI.", scores: [1,0.5,0.5,0.5,1,1,1,0.5,1,1,1,0.5,1,1,1,0.5,1,1,1,0.5,0.5,0.5,1,0.5,1,0.5,0,1,1,1,1,1,1,1,1,0.5,0.5,1,1,0.5,1,0.5,1,0.5,0.5,0.5,1,1,0.5,1] },
+      { id: "S26", name: "CHEK", category: "EU Research", desc: "EU project for cross-domain compliance checking using semantic technologies.", scores: [1,0.5,0.5,1,1,1,1,0.5,1,1,1,0.5,1,1,1,0.5,1,1,0.5,0.5,0,1,0.5,0.5,0.5,0.5,0,1,1,1,1,1,1,0.5,1,0.5,0.5,1,1,0.5,1,0.5,1,0.5,0.5,0.5,1,1,0.5,1] },
+      { id: "S27", name: "DigiChecks", category: "EU Research", desc: "Digital building permit project focusing on machine-readable regulations.", scores: [1,0.5,0.5,0.5,1,1,1,0.5,1,1,1,0.5,1,1,1,0.5,1,0.5,0.5,0.5,0,0.5,1,0.5,1,0.5,0,1,1,1,1,1,1,0.5,1,0.5,0.5,1,1,0.5,1,0.5,1,0.5,0.5,0.5,1,1,0.5,1] },
+      { id: "S28", name: "BIM4EEB", category: "EU Research", desc: "EU project for BIM-based energy efficiency in existing buildings renovation.", scores: [1,0.5,0,0,1,0.5,0.5,0.5,0.5,0.5,0.5,0,0.5,1,0.5,0,0.5,0.5,0.5,1,0,0.5,0,0.5,0,0.5,0,1,0.5,0,1,1,1,0,0.5,0,1,1,0.5,0.5,0.5,0.5,0.5,0,0,0.5,0.5,0,0,0.5] },
+      { id: "S29", name: "BIMERR", category: "EU Research", desc: "BIM-based holistic renovation toolkit for energy-efficient buildings.", scores: [1,0.5,0.5,0,1,0.5,0.5,0.5,0.5,0.5,0.5,0,0.5,1,0.5,0,0,0.5,0.5,1,0,0.5,0,0.5,0,0.5,0,1,1,0.5,1,1,1,0,0.5,0,0.5,1,0.5,0.5,0.5,0.5,0.5,0,0,0.5,0.5,0,0,0.5] },
+      { id: "S30", name: "SEEBIM", category: "University", desc: "Semantic enrichment of BIM models for automated code compliance checking.", scores: [1,0.5,0,0,1,0.5,1,0,1,1,0,0,1,1,1,0,0.5,0.5,0.5,0,0,0.5,0.5,0,0.5,0,0,0.5,0,0,1,1,0.5,0,0.5,0,0,0,1,0,0.5,0,0.5,0,0,0,0.5,0.5,0,0] },
+      { id: "S31", name: "UIUC NLP", category: "University", desc: "University of Illinois NLP research for extracting rules from building codes.", scores: [0.5,0,0.5,0,0,0.5,0.5,0,1,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,1,0,1,0,0,0.5,0,0,1,1,0,0,1,0,0,0,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S32", name: "BERA", category: "University", desc: "Building Environment Rule Analysis framework for automated checking.", scores: [1,0,0,0,1,0.5,1,0,1,1,0,0,1,1,1,0,1,0.5,0.5,0,0,0.5,0,0,0,0,0,0,0,0,1,1,0.5,0,0.5,0,0,0,0.5,0,0.5,0,0.5,0,0,0,0,0,0,0] },
+      { id: "S33", name: "VCCL", category: "University", desc: "Visual Code Checking Language for expressing building regulations.", scores: [1,0.5,0,0,0.5,0.5,1,1,0.5,0.5,0.5,0,1,1,1,0,0.5,0.5,0.5,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0.5,0,0,0.5,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S34", name: "Semantic Web", category: "University", desc: "Ontology-based approaches using RDF/OWL for building regulation representation.", scores: [1,0,0,0,0.5,0.5,1,0,1,1,0.5,0,0.5,1,1,0,0.5,0.5,0.5,0.5,0,0.5,0.5,0,0.5,0,0,1,1,1,1,1,0.5,0,0.5,0,0,0,1,0,0.5,0,0,0,0,0,0,0.5,0,0.5] },
+      { id: "S35", name: "CBIMS", category: "University", desc: "Constraint-Based BIM System for automated spatial compliance checking.", scores: [1,0.5,0,0,0.5,0.5,0.5,0,1,1,0,0,0.5,1,0.5,0,0.5,0.5,0.5,0,0,0,0.5,0,0.5,0,0,0.5,0.5,0.5,1,1,0.5,0,0.5,0,0,0,1,0,0.5,0,0,0,0,0,0.5,0.5,0,0.5] },
+      { id: "S36", name: "KG ACC", category: "University", desc: "Knowledge Graph-based Automated Compliance Checking research.", scores: [1,0.5,0,0,0.5,0.5,0.5,0,1,1,0,0,0.5,1,0.5,0,0.5,0.5,0.5,0,0,0,1,0,0.5,0,0,1,0.5,0,1,1,0.5,0,0.5,0,0,0,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S37", name: "Penn State", category: "University", desc: "Penn State CIC research on BIM-based code compliance automation.", scores: [0,1,0,0,0,0.5,0.5,0,1,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,1,0,1,0,0,0,0,0,1,1,0.5,0,0.5,0,1,0,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S38", name: "Stuttgart", category: "University", desc: "University of Stuttgart research on semantic BIM and linked data for AEC.", scores: [1,0,0,0,0.5,0.5,1,0,1,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,1,0,1,0,0,1,1,0.5,1,1,0.5,0,0.5,0,0,0,1,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S39", name: "Purdue", category: "University", desc: "Purdue University research on NLP and ML for building code interpretation.", scores: [0.5,0,0.5,0,0,0.5,0.5,0,1,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,1,0,0.5,0,0,0,0,0,1,1,0,0,1,0,0,0,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S40", name: "RASE", category: "University", desc: "Requirement, Applicability, Selection, Exception markup methodology.", scores: [1,0,0,0,0.5,0.5,1,0.5,0.5,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,0.5,0,0.5,0,0,0.5,0,0,0.5,0.5,0,0,1,0,0,0,0.5,0,0,0,0,0,0,0,0,0.5,0,0] },
+      { id: "S41", name: "Cambridge", category: "University", desc: "University of Cambridge research on digital building regulations and compliance.", scores: [1,0,0.5,0,0.5,0.5,1,0,1,1,0.5,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0,0,0,1,0,0.5,0,0,1,0.5,0.5,1,1,0.5,0,0.5,0,0,0,0.5,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S42", name: "LBD", category: "University", desc: "Linked Building Data community developing ontologies for the built environment.", scores: [1,0,0,0,0.5,0,0.5,0,1,1,0,0,0.5,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0.5,0.5,0.5,0,0,0,0,0,0,1,0,0.5,0,0,0,0,0,0,0.5,0,0.5] },
+      { id: "S43", name: "IAAC Fire Sense", category: "University", desc: "IAAC thesis on fire safety compliance checking using computational methods.", scores: [1,0,0,0,0.5,0.5,1,0.5,1,1,0,0,1,1,1,0,0.5,0.5,1,0,0,0,0.5,0,0.5,0,0,1,0.5,0,1,1,1,0,0.5,0,0,0,1,0,0.5,0,0,0,0,0,0,0,0,0] },
+      { id: "S44", name: "IAAC BUILDCODE", category: "University", desc: "IAAC thesis on LLM-based building code interpretation and compliance.", scores: [1,0,0.5,0,0,1,0.5,0,1,1,1,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,0.5,1,0,0.5,0,0,0.5,0,0,1,1,0.5,0,1,0,0,1,1,0,0.5,0,0.5,0,0,0,0,0,0,0] },
+      { id: "S45", name: "IAAC AI-BIM", category: "University", desc: "IAAC research on AI-assisted BIM workflows and validation.", scores: [1,1,0,0,0.5,0.5,0.5,0.5,0.5,0.5,0,0,0.5,0.5,0.5,0,0.5,0.5,0.5,0.5,0,0,1,0,0.5,0,0,0,0,0,1,1,0.5,0,0.5,0,1,0.5,0.5,0.5,0.5,0.5,0.5,0,0,0,0,0,0,0] },
+      { id: "S46", name: "IAAC Perf Layout", category: "University", desc: "IAAC thesis on performance-driven spatial layout optimization.", scores: [0.5,0.5,0,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0,0,1,0.5,0.5,0,1,0.5,0.5,0.5,0,0.5,0.5,0,0,0.5,1,0,0,0,1,1,1,0,0.5,0,1,0.5,0.5,0.5,0.5,0,0.5,0,0,0,0,0,0,0] },
+      { id: "S47", name: "IAAC Comp BIM", category: "University", desc: "IAAC computational BIM research for automated design validation.", scores: [1,1,0,0,1,0.5,0.5,0.5,0.5,0.5,0,0,1,1,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0,0.5,0,0,0,0,0,0,0,1,1,1,0.5,0.5,0,1,0.5,0.5,0.5,0.5,0.5,0.5,0,0,0,0,0,0,0] },
+      { id: "S48", name: "IfcOpenShell", category: "Open Source", desc: "Open source IFC geometry engine and Python library for BIM development.", scores: [1,0,0,0,0.5,0,1,0,1,0.5,0,0,1,1,1,1,0.5,0,0,0,0,0,0,0,0,0,0,0,0.5,0,1,0.5,0.5,1,0,0,0,0,1,0,1,0,0,0,0,0,1,1,0,0.5] },
+      { id: "S49", name: "xBIM", category: "Open Source", desc: "Open source .NET toolkit for reading, writing and visualizing IFC files.", scores: [1,0,0,0,0.5,0,1,0,1,0.5,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0.5,0.5,0.5,0,0,0,0,1,0,0.5,0,0,0,0,0,1,1,1,0.5] },
+      { id: "S50", name: "BIMServer", category: "Open Source", desc: "Open source BIM server for model storage, versioning and collaboration.", scores: [1,0,0,0,1,0,1,0,1,0.5,0,0.5,0.5,0.5,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0.5,0,0,0.5,0.5,1,0.5,0,0,0.5,1,1,0,1,0.5,0,0,0,0.5,0.5,0.5,0,0.5] },
+      { id: "S51", name: "Forma", category: "AI/Emerging", desc: "Autodesk's AI-powered conceptual design platform with real-time analysis.", scores: [0,1,0.5,1,0.5,0.5,0,0,0,0.5,0.5,0.5,1,0.5,0.5,0,0.5,0.5,0.5,1,0,1,0.5,0.5,0,1,1,0,0,0,1,1,1,0,0.5,0,0,1,1,1,0.5,1,1,0,0,0,0,0,0,0.5] },
+      { id: "S52", name: "TestFit", category: "AI/Emerging", desc: "Real-time generative design for building feasibility and site planning.", scores: [0,0.5,1,1,0,0.5,0,0,0,0.5,0.5,0.5,1,0.5,0.5,0,0,0,0,0.5,0,1,0.5,0.5,0,0.5,1,0,0,0,1,1,1,0,0.5,0,0,1,1,1,0.5,0,1,0,0,0,0,0,0,0] },
+      { id: "S53", name: "Higharc", category: "AI/Emerging", desc: "AI-powered home design platform automating residential architecture.", scores: [0,1,0.5,0.5,0,0.5,0,0.5,0,0.5,0,0.5,1,0.5,0.5,0,0,0.5,0.5,0.5,0,0.5,0.5,1,0,0.5,1,0,0,0,1,1,1,0,0.5,0,0,1,1,1,1,0.5,1,0,0,0,0,0,0,0] },
+      { id: "S54", name: "Buildots", category: "AI/Emerging", desc: "AI construction monitoring using 360° cameras and computer vision.", scores: [0,0.5,0,0,0,0.5,0,0,0,0,0,0,0.5,0.5,0,0,0,0,0,0,0,0,0.5,1,0,1,0,0,0,0,1,1,1,0,0,0,0,1,1,0,1,0.5,0.5,0,0,0.5,0,0,0,0] },
+      { id: "S55", name: "cove.tool", category: "AI/Emerging", desc: "Automated building performance analysis for energy and daylight optimization.", scores: [0.5,1,0.5,0.5,0,1,0.5,0.5,0,0.5,1,0.5,0.5,0.5,0.5,0,0,0,0,1,0,0.5,1,0,0,0.5,0.5,0,0,0,1,1,1,0,0.5,0.5,1,1,1,1,1,0.5,1,0,0,0,0,0,0,0.5] },
+      { id: "S56", name: "ICC Navigator", category: "AI/Emerging", desc: "AI-powered search and navigation for International Code Council publications.", scores: [0,0.5,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0.5,0.5,0.5,0.5,0.5,0.5,1,0,0.5,0,0,0,0,0,0.5,1,0,0,1,0,0.5,1,0.5,0,0,0,1,0,0,0,0,0,0,0] },
+      { id: "S57", name: "Speckle", category: "AI/Emerging", desc: "Open data platform for AEC with real-time collaboration and automation.", scores: [1,1,0.5,0.5,1,0.5,1,0.5,1,0.5,0.5,0.5,1,1,1,1,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0,0.5,0.5,0,0,0.5,0,1,1,1,0.5,0.5,0,1,1,1,0.5,1,1,1,0,0,0.5,0.5,0.5,0,0.5] }
+    ];
+
+    var capabilityNames = [
+      "IFC Support", "Native BIM", "PDF/2D", "GIS", "Model Aggregation",
+      "Pre-built Rules", "Custom Rules", "Visual Editor", "Code-based Rules", "Machine-readable", "Multi-jurisdiction", "Version Mgmt",
+      "Geometric", "Property", "Relationship", "Clash", "Egress", "Accessibility", "Fire Safety", "Energy", "Structural", "Zoning",
+      "LLM/NLP", "Computer Vision", "Auto Rule Gen", "Predictive", "Generative",
+      "Ontology/KG", "Linked Data", "SHACL",
+      "Pass/Fail", "Reports", "Visual", "BCF", "Citation", "Certificates",
+      "BIM Plugin", "Cloud/SaaS", "API", "Real-time", "Batch", "CDE Integration",
+      "Pre-submit", "Official Portal", "Multi-agency", "Comms",
+      "IDS", "MVD", "COBie", "ISO 19650"
+    ];
+
+    var capabilityDescs = [
+      "Support for Industry Foundation Classes (IFC) open BIM standard",
+      "Direct integration with native BIM authoring tools (Revit, ArchiCAD, etc.)",
+      "Processing of PDF documents and 2D drawings",
+      "Geographic Information System integration for spatial analysis",
+      "Ability to combine and federate multiple BIM models",
+      "Library of pre-configured compliance rules ready to use",
+      "User-definable custom rules and validation logic",
+      "Graphical interface for creating and editing rules",
+      "Programmatic rule definition using scripting or query languages",
+      "Rules stored in structured, parseable formats (JSON, XML, etc.)",
+      "Support for regulations from multiple jurisdictions",
+      "Tracking changes and versions of rules over time",
+      "Checking spatial dimensions, areas, volumes, and geometry",
+      "Validating element properties and attributes",
+      "Checking relationships and connections between elements",
+      "Detection of physical conflicts between building components",
+      "Egress path analysis and emergency exit compliance",
+      "ADA/accessibility requirements checking",
+      "Fire safety and protection requirements validation",
+      "Energy code and performance compliance checking",
+      "Structural requirements and load path verification",
+      "Zoning regulations and land use compliance",
+      "Large Language Models and Natural Language Processing for text analysis",
+      "Image and visual recognition using machine learning",
+      "Automated extraction of rules from regulatory documents",
+      "ML-based prediction of compliance issues",
+      "AI-generated design alternatives and solutions",
+      "Ontology and Knowledge Graph-based semantic representation",
+      "Linked Data principles for connecting distributed information",
+      "SHACL (Shapes Constraint Language) for RDF validation",
+      "Binary pass/fail compliance results",
+      "Detailed compliance reports and documentation",
+      "Visual highlighting of issues in 3D model",
+      "BIM Collaboration Format for issue tracking",
+      "References to specific code sections and clauses",
+      "Generation of compliance certificates",
+      "Plugin integration with BIM authoring software",
+      "Cloud-based or Software-as-a-Service deployment",
+      "Application Programming Interface for integration",
+      "Live checking during design process",
+      "Processing multiple models or large datasets",
+      "Common Data Environment integration",
+      "Pre-submission validation before official review",
+      "Connection to government permit portals",
+      "Coordination across multiple regulatory agencies",
+      "Communication tools for reviewer feedback",
+      "Information Delivery Specification support",
+      "Model View Definition compliance",
+      "Construction Operations Building information exchange",
+      "ISO 19650 BIM management standards compliance"
+    ];
+
+    var capabilityGroups = {
+      "Data Input": [0, 1, 2, 3, 4],
+      "Rule Definition": [5, 6, 7, 8, 9, 10, 11],
+      "Checking Types": [12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+      "AI/ML": [22, 23, 24, 25, 26],
+      "Semantic": [27, 28, 29],
+      "Output": [30, 31, 32, 33, 34, 35],
+      "Integration": [36, 37, 38, 39, 40, 41],
+      "Workflow": [42, 43, 44, 45],
+      "Standards": [46, 47, 48, 49]
+    };
+
+    var categoryColors = {
+      "Commercial": "#3B82F6",
+      "Government": "#10B981",
+      "EU Research": "#F59E0B",
+      "University": "#EF4444",
+      "Open Source": "#8B5CF6",
+      "AI/Emerging": "#F97316"
+    };
+
+    var groupColors = {
+      "Data Input": "#06B6D4",
+      "Rule Definition": "#8B5CF6",
+      "Checking Types": "#EC4899",
+      "AI/ML": "#F59E0B",
+      "Semantic": "#10B981",
+      "Output": "#3B82F6",
+      "Integration": "#6366F1",
+      "Workflow": "#14B8A6",
+      "Standards": "#78716C"
+    };
+
+    // Cluster centers arranged in a circle
+    var categoryOrder = ["Commercial", "Government", "EU Research", "University", "Open Source", "AI/Emerging"];
+    var groupOrder = ["Data Input", "Rule Definition", "Checking Types", "AI/ML", "Semantic", "Output", "Integration", "Workflow", "Standards"];
+
+    function getCapGroup(idx) {
+      for (var group in capabilityGroups) {
+        if (capabilityGroups[group].indexOf(idx) >= 0) return group;
+      }
+      return "Other";
+    }
+
+    function getClusterCenter(node, width, height) {
+      var cx = width / 2;
+      var cy = height / 2;
+      var radius = Math.min(width, height) * 0.3;
+      
+      if (node.type === "system") {
+        var idx = categoryOrder.indexOf(node.category);
+        var angle = (idx / categoryOrder.length) * Math.PI * 2 - Math.PI / 2;
+        return {
+          x: cx + Math.cos(angle) * radius,
+          y: cy + Math.sin(angle) * radius
+        };
+      } else {
+        var idx = groupOrder.indexOf(node.group);
+        var angle = (idx / groupOrder.length) * Math.PI * 2 - Math.PI / 2;
+        return {
+          x: cx + Math.cos(angle) * radius * 0.6,
+          y: cy + Math.sin(angle) * radius * 0.6
+        };
+      }
+    }
+
+    var svg, simulation, nodeG, linkG, nodes, links, linkElements, nodeElements;
+    var currentViewMode = "all";
+    var currentCategoryFilter = "All";
+    var currentCapGroupFilter = "All";
+    var currentMinScore = 0.5;
+    var clusterStrength = 0.08;
+    var linkStrengthVal = 0.05;
+
+    function initGraph() {
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+
+      svg = d3.select("#graph")
+        .attr("width", width)
+        .attr("height", height);
+      
+      svg.call(d3.zoom()
+        .scaleExtent([0.1, 5])
+        .on("zoom", function(event) {
+          container.attr("transform", event.transform);
+        }));
+
+      var container = svg.append("g");
+      linkG = container.append("g").attr("class", "links");
+      nodeG = container.append("g").attr("class", "nodes");
+
+      simulation = d3.forceSimulation()
+        .force("charge", d3.forceManyBody().strength(-150))
+        .force("collision", d3.forceCollide().radius(function(d) { return d.radius + 5; }))
+        .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05));
+
+      buildAndRender();
+    }
+
+    function buildGraphData() {
+      var graphNodes = [];
+      var graphLinks = [];
+
+      var filteredSystems = currentCategoryFilter === "All" 
+        ? systemsData 
+        : systemsData.filter(function(s) { return s.category === currentCategoryFilter; });
+
+      var filteredCapIndices = currentCapGroupFilter === "All"
+        ? capabilityNames.map(function(_, i) { return i; })
+        : (capabilityGroups[currentCapGroupFilter] || []);
+
+      if (currentViewMode === "all" || currentViewMode === "systems") {
+        filteredSystems.forEach(function(sys) {
+          var connCount = filteredCapIndices.filter(function(i) { return sys.scores[i] >= currentMinScore; }).length;
+          graphNodes.push({
+            id: sys.id,
+            name: sys.name,
+            type: "system",
+            category: sys.category,
+            desc: sys.desc,
+            color: categoryColors[sys.category],
+            radius: Math.max(20, Math.min(40, 14 + connCount * 0.6)),
+            connections: connCount
+          });
+        });
+      }
+
+      if (currentViewMode === "all") {
+        filteredCapIndices.forEach(function(idx) {
+          var connCount = filteredSystems.filter(function(s) { return s.scores[idx] >= currentMinScore; }).length;
+          if (connCount > 0) {
+            var group = getCapGroup(idx);
+            graphNodes.push({
+              id: "C" + idx,
+              name: capabilityNames[idx],
+              type: "capability",
+              group: group,
+              desc: capabilityDescs[idx],
+              color: groupColors[group],
+              radius: Math.max(16, Math.min(35, 10 + connCount * 0.5)),
+              connections: connCount
+            });
+          }
+        });
+
+        filteredSystems.forEach(function(sys) {
+          filteredCapIndices.forEach(function(idx) {
+            if (sys.scores[idx] >= currentMinScore) {
+              graphLinks.push({
+                source: sys.id,
+                target: "C" + idx,
+                value: sys.scores[idx]
+              });
+            }
+          });
+        });
+      }
+
+      if (currentViewMode === "systems") {
+        for (var i = 0; i < filteredSystems.length; i++) {
+          for (var j = i + 1; j < filteredSystems.length; j++) {
+            var sharedCount = 0;
+            filteredCapIndices.forEach(function(idx) {
+              if (filteredSystems[i].scores[idx] >= currentMinScore && 
+                  filteredSystems[j].scores[idx] >= currentMinScore) {
+                sharedCount++;
+              }
+            });
+            if (sharedCount >= 8) {
+              graphLinks.push({
+                source: filteredSystems[i].id,
+                target: filteredSystems[j].id,
+                value: sharedCount / 50
+              });
+            }
+          }
+        }
+      }
+
+      if (currentViewMode === "capabilities") {
+        filteredCapIndices.forEach(function(idx) {
+          var connCount = filteredSystems.filter(function(s) { return s.scores[idx] >= currentMinScore; }).length;
+          var group = getCapGroup(idx);
+          graphNodes.push({
+            id: "C" + idx,
+            name: capabilityNames[idx],
+            type: "capability",
+            group: group,
+            desc: capabilityDescs[idx],
+            color: groupColors[group],
+            radius: Math.max(18, Math.min(40, 12 + connCount * 0.6)),
+            connections: connCount
+          });
+        });
+
+        for (var i = 0; i < filteredCapIndices.length; i++) {
+          for (var j = i + 1; j < filteredCapIndices.length; j++) {
+            var cooccurCount = 0;
+            filteredSystems.forEach(function(sys) {
+              if (sys.scores[filteredCapIndices[i]] >= currentMinScore && 
+                  sys.scores[filteredCapIndices[j]] >= currentMinScore) {
+                cooccurCount++;
+              }
+            });
+            if (cooccurCount >= 12) {
+              graphLinks.push({
+                source: "C" + filteredCapIndices[i],
+                target: "C" + filteredCapIndices[j],
+                value: cooccurCount / 57
+              });
+            }
+          }
+        }
+      }
+
+      return { nodes: graphNodes, links: graphLinks };
+    }
+
+    function buildAndRender() {
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      
+      var data = buildGraphData();
+      nodes = data.nodes;
+      links = data.links;
+
+      document.getElementById("nodeCount").textContent = nodes.length;
+      document.getElementById("linkCount").textContent = links.length;
+
+      document.getElementById("systemLegend").style.display = 
+        (currentViewMode === "all" || currentViewMode === "systems") ? "block" : "none";
+      document.getElementById("capLegend").style.display = 
+        (currentViewMode === "all" || currentViewMode === "capabilities") ? "block" : "none";
+
+      linkG.selectAll("*").remove();
+      nodeG.selectAll("*").remove();
+
+      // Links
+      linkElements = linkG.selectAll("line")
+        .data(links)
+        .enter()
+        .append("line")
+        .attr("class", function(d) { return "link " + (d.value === 1 ? "full" : "partial"); })
+        .attr("stroke-width", function(d) { return Math.max(1, d.value * 2.5); });
+
+      // Nodes
+      nodeElements = nodeG.selectAll("g.node")
+        .data(nodes)
+        .enter()
+        .append("g")
+        .attr("class", "node")
+        .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended))
+        .on("mouseenter", function(event, d) {
+          highlightConnections(d);
+          showInfo(d);
+        })
+        .on("mouseleave", function() {
+          resetHighlight();
+          hideInfo();
+        });
+
+      nodeElements.append("circle")
+        .attr("r", function(d) { return d.radius; })
+        .attr("fill", function(d) { return d.color; })
+        .attr("stroke", function(d) { 
+          var isLight = document.body.classList.contains("light-mode");
+          if (d.type === "system") {
+            return isLight ? "#000000" : "#ffffff";
+          } else {
+            return isLight ? "#ffffff" : "#000000";
+          }
+        })
+        .attr("stroke-width", 3);
+
+      nodeElements.append("text")
+        .attr("dy", 4)
+        .attr("font-size", function(d) { return Math.max(7, Math.min(10, d.radius / 2.8)); })
+        .text(function(d) { return d.name.length > 12 ? d.name.slice(0, 11) + "…" : d.name; });
+
+      // Setup simulation
+      simulation.nodes(nodes);
+      simulation.force("link", d3.forceLink(links).id(function(d) { return d.id; }).distance(100).strength(linkStrengthVal));
+      
+      simulation.on("tick", function() {
+        // Apply clustering force manually each tick
+        var alpha = simulation.alpha();
+        nodes.forEach(function(d) {
+          var target = getClusterCenter(d, width, height);
+          d.vx += (target.x - d.x) * alpha * clusterStrength;
+          d.vy += (target.y - d.y) * alpha * clusterStrength;
+        });
+
+        linkElements
+          .attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+
+        nodeElements.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+      });
+
+      simulation.alpha(1).restart();
+    }
+
+    function updateForces() {
+      simulation.force("link").strength(linkStrengthVal);
+      simulation.alpha(0.5).restart();
+    }
+
+    function highlightConnections(d) {
+      var connectedIds = {};
+      connectedIds[d.id] = true;
+      
+      links.forEach(function(link) {
+        var sourceId = link.source.id || link.source;
+        var targetId = link.target.id || link.target;
+        if (sourceId === d.id) connectedIds[targetId] = true;
+        if (targetId === d.id) connectedIds[sourceId] = true;
+      });
+
+      nodeG.selectAll("g.node")
+        .classed("dimmed", function(n) { return !connectedIds[n.id]; });
+
+      linkG.selectAll("line")
+        .classed("highlighted", function(l) { 
+          return (l.source.id || l.source) === d.id || (l.target.id || l.target) === d.id; 
+        })
+        .classed("dimmed", function(l) { 
+          return (l.source.id || l.source) !== d.id && (l.target.id || l.target) !== d.id; 
+        });
+    }
+
+    function resetHighlight() {
+      nodeG.selectAll("g.node").classed("dimmed", false);
+      linkG.selectAll("line").classed("highlighted", false).classed("dimmed", false);
+    }
+
+    function showInfo(d) {
+      var panel = document.getElementById("infoPanel");
+      var title = document.getElementById("infoTitle");
+      var typeLabel = document.getElementById("infoType");
+      var descEl = document.getElementById("infoDesc");
+      var connections = document.getElementById("infoConnections");
+
+      title.innerHTML = '<span style="color:' + d.color + '">' + d.name + '</span>';
+      
+      var connectedNodes = [];
+      links.forEach(function(link) {
+        var sourceId = link.source.id || link.source;
+        var targetId = link.target.id || link.target;
+        if (sourceId === d.id) {
+          var target = nodes.find(function(n) { return n.id === targetId; });
+          if (target) connectedNodes.push(target.name);
+        }
+        if (targetId === d.id) {
+          var source = nodes.find(function(n) { return n.id === sourceId; });
+          if (source) connectedNodes.push(source.name);
+        }
+      });
+
+      var typeText = d.type === "system" 
+        ? "System • " + d.category 
+        : "Capability • " + d.group;
+      
+      typeLabel.innerHTML = typeText;
+      descEl.innerHTML = d.desc || "";
+      connections.innerHTML = "<strong>" + connectedNodes.length + " connections:</strong><br>" + connectedNodes.join(" • ");
+      
+      panel.classList.add("visible");
+    }
+
+    function hideInfo() {
+      document.getElementById("infoPanel").classList.remove("visible");
+    }
+
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+
+    // Event listeners
+    document.getElementById("viewMode").addEventListener("change", function(e) {
+      currentViewMode = e.target.value;
+      buildAndRender();
+    });
+
+    document.getElementById("categoryFilter").addEventListener("change", function(e) {
+      currentCategoryFilter = e.target.value;
+      buildAndRender();
+    });
+
+    document.getElementById("capGroupFilter").addEventListener("change", function(e) {
+      currentCapGroupFilter = e.target.value;
+      buildAndRender();
+    });
+
+    document.getElementById("minScore").addEventListener("change", function(e) {
+      currentMinScore = parseFloat(e.target.value);
+      buildAndRender();
+    });
+
+    // Slider event listeners
+    document.getElementById("clusterStrength").addEventListener("input", function(e) {
+      clusterStrength = parseFloat(e.target.value);
+      document.getElementById("clusterVal").textContent = clusterStrength.toFixed(2);
+      simulation.alpha(0.5).restart();
+    });
+
+    document.getElementById("linkStrength").addEventListener("input", function(e) {
+      linkStrengthVal = parseFloat(e.target.value);
+      document.getElementById("linkVal").textContent = linkStrengthVal.toFixed(3);
+      updateForces();
+    });
+
+    window.addEventListener("resize", function() {
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      svg.attr("width", width).attr("height", height);
+      simulation.force("center", d3.forceCenter(width / 2, height / 2).strength(0.05));
+      simulation.alpha(0.3).restart();
+    });
+
+    // Initialize
+    initGraph();
+  </script>
+</body>
+</html>
