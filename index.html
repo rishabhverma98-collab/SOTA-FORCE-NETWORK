@@ -322,9 +322,11 @@
     #graph {
       width: 100vw;
       height: 100vh;
+      touch-action: none;
     }
     .node {
       cursor: pointer;
+      touch-action: none;
     }
     .node text {
       fill: #fff;
@@ -554,10 +556,262 @@
       border-top-color: #ddd;
       color: #888;
     }
+    .nav-hint .mobile-hint {
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .nav-hint .desktop-hint {
+        display: none;
+      }
+      .nav-hint .mobile-hint {
+        display: inline;
+      }
+    }
+
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+      .controls {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        padding: 12px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .controls.collapsed {
+        max-height: 50px;
+        overflow: hidden;
+      }
+      .controls.collapsed .controls-toggle {
+        position: static;
+        display: block;
+        margin: -2px auto 0;
+        text-align: center;
+      }
+      .controls.collapsed .header-row,
+      .controls.collapsed .control-group,
+      .controls.collapsed .slider-group,
+      .controls.collapsed .border-legend,
+      .controls.collapsed .legend {
+        display: none;
+      }
+      .header-row {
+        margin-bottom: 12px;
+      }
+      .controls h1 {
+        font-size: 14px;
+      }
+      .controls .subtitle {
+        font-size: 10px;
+      }
+      .control-group {
+        margin-bottom: 10px;
+      }
+      .control-group label {
+        font-size: 9px;
+      }
+      select {
+        padding: 6px;
+        font-size: 11px;
+      }
+      .slider-group {
+        margin-bottom: 10px;
+      }
+      .slider-group label {
+        font-size: 9px;
+      }
+      .legend, .border-legend {
+        margin-top: 12px;
+        padding-top: 12px;
+      }
+      .legend-item, .border-legend-item {
+        font-size: 10px;
+        margin-bottom: 4px;
+      }
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+      }
+      .border-sample {
+        width: 14px;
+        height: 14px;
+      }
+      
+      .stats {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+        left: auto;
+        padding: 8px 12px;
+        font-size: 10px;
+      }
+      
+      .info-panel {
+        bottom: 50px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        max-height: 180px;
+        padding: 12px;
+      }
+      .info-panel h3 {
+        font-size: 13px;
+      }
+      .info-panel .type-label,
+      .info-panel .description,
+      .info-panel .connections {
+        font-size: 10px;
+      }
+      .info-panel .description {
+        padding: 6px 8px;
+        margin-bottom: 8px;
+      }
+      
+      .insights-panel {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-height: 50vh;
+      }
+      .insights-panel.mobile-collapsed {
+        max-height: 44px;
+        overflow: hidden;
+      }
+      .insights-header {
+        padding: 12px 14px;
+      }
+      .insights-header h2 {
+        font-size: 13px;
+      }
+      .insights-content {
+        padding: 12px 14px;
+        max-height: calc(50vh - 44px);
+      }
+      .insight-section {
+        margin-bottom: 14px;
+      }
+      .insight-section h3 {
+        font-size: 10px;
+        margin-bottom: 10px;
+      }
+      .insight-item {
+        padding: 8px 10px;
+        margin-bottom: 10px;
+        gap: 10px;
+      }
+      .insight-icon {
+        font-size: 14px;
+        width: 20px;
+      }
+      .insight-item strong {
+        font-size: 11px;
+      }
+      .insight-item p {
+        font-size: 10px;
+      }
+      .conclusion-box {
+        padding: 10px;
+      }
+      .conclusion-box p,
+      .conclusion-box li {
+        font-size: 10px;
+      }
+      .nav-hint {
+        margin-top: 12px;
+        padding-top: 10px;
+        font-size: 9px;
+      }
+      
+      .mode-toggle {
+        width: 32px;
+        height: 32px;
+      }
+      .mode-icon {
+        font-size: 16px;
+      }
+      
+      .controls-toggle {
+        display: block;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .controls {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        padding: 10px;
+      }
+      .controls h1 {
+        font-size: 13px;
+      }
+      select {
+        padding: 5px;
+        font-size: 10px;
+      }
+      .legend-item, .border-legend-item {
+        font-size: 9px;
+      }
+      
+      .insights-panel {
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        max-height: 45vh;
+      }
+      .insights-header {
+        padding: 10px 12px;
+      }
+      .insights-header h2 {
+        font-size: 12px;
+      }
+      .insights-content {
+        padding: 10px 12px;
+      }
+      
+      .info-panel {
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        max-height: 200px;
+        padding: 10px;
+        z-index: 150;
+      }
+      
+      .stats {
+        padding: 6px 10px;
+        font-size: 9px;
+      }
+    }
+
+    /* Controls collapse button for mobile */
+    .controls-toggle {
+      display: none;
+      position: absolute;
+      top: 12px;
+      right: 50px;
+      background: transparent;
+      border: none;
+      color: #888;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    body.light-mode .controls-toggle {
+      color: #555;
+    }
+    @media (max-width: 768px) {
+      .controls-toggle {
+        display: block;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="controls">
+  <div class="controls" id="controlsPanel">
+    <button class="controls-toggle" id="controlsToggle" onclick="toggleControls()">▼ Hide</button>
     <div class="header-row">
       <div>
         <h1>Network Graph</h1>
@@ -740,7 +994,8 @@
         </div>
       </div>
       <div class="nav-hint">
-        💡 Drag nodes • Hover to highlight • Scroll to zoom • Pan to move
+        <span class="desktop-hint">💡 Drag nodes • Hover to highlight • Scroll to zoom • Pan to move</span>
+        <span class="mobile-hint">💡 Drag nodes • Tap to highlight • Pinch to zoom • Pan to move</span>
       </div>
     </div>
   </div>
@@ -754,6 +1009,19 @@
       var icon = document.getElementById("toggleIcon");
       content.classList.toggle("collapsed");
       icon.classList.toggle("collapsed");
+    }
+
+    // Toggle controls panel (mobile)
+    function toggleControls() {
+      var controls = document.getElementById("controlsPanel");
+      var toggle = document.getElementById("controlsToggle");
+      controls.classList.toggle("collapsed");
+      
+      if (controls.classList.contains("collapsed")) {
+        toggle.textContent = "▶ Show Controls";
+      } else {
+        toggle.textContent = "▼ Hide";
+      }
     }
 
     // Toggle light/dark mode
@@ -1174,6 +1442,26 @@
         .on("mouseleave", function() {
           resetHighlight();
           hideInfo();
+        })
+        .on("touchstart", function(event, d) {
+          event.stopPropagation();
+          highlightConnections(d);
+          showInfo(d);
+        })
+        .on("click", function(event, d) {
+          // For mobile: toggle info on click/tap
+          if (window.innerWidth <= 768) {
+            event.stopPropagation();
+            var panel = document.getElementById("infoPanel");
+            if (panel.classList.contains("visible") && panel.dataset.nodeId === d.id) {
+              resetHighlight();
+              hideInfo();
+            } else {
+              highlightConnections(d);
+              showInfo(d);
+              panel.dataset.nodeId = d.id;
+            }
+          }
         });
 
       nodeElements.append("circle")
@@ -1284,10 +1572,20 @@
       connections.innerHTML = "<strong>" + connectedNodes.length + " connections:</strong><br>" + connectedNodes.join(" • ");
       
       panel.classList.add("visible");
+      
+      // On mobile, hide insights panel when info is shown
+      if (window.innerWidth <= 480) {
+        document.getElementById("insightsPanel").style.display = "none";
+      }
     }
 
     function hideInfo() {
       document.getElementById("infoPanel").classList.remove("visible");
+      
+      // On mobile, show insights panel again
+      if (window.innerWidth <= 480) {
+        document.getElementById("insightsPanel").style.display = "block";
+      }
     }
 
     function dragstarted(event, d) {
@@ -1351,6 +1649,39 @@
 
     // Initialize
     initGraph();
+
+    // Mobile: collapse insights panel by default and setup touch
+    function initMobile() {
+      if (window.innerWidth <= 768) {
+        var content = document.getElementById("insightsContent");
+        var icon = document.getElementById("toggleIcon");
+        content.classList.add("collapsed");
+        icon.classList.add("collapsed");
+      }
+    }
+    initMobile();
+    
+    // Handle orientation change
+    window.addEventListener("orientationchange", function() {
+      setTimeout(function() {
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+        svg.attr("width", width).attr("height", height);
+        simulation.force("center", d3.forceCenter(width / 2, height / 2).strength(0.05));
+        simulation.alpha(0.3).restart();
+      }, 100);
+    });
+
+    // Close info panel when tapping elsewhere on mobile
+    svg.on("click", function(event) {
+      if (window.innerWidth <= 768) {
+        // Check if click was on background (not on a node)
+        if (event.target.tagName === "svg" || event.target.tagName === "g") {
+          resetHighlight();
+          hideInfo();
+        }
+      }
+    });
   </script>
 </body>
 </html>
