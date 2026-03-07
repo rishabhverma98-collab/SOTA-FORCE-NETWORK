@@ -439,6 +439,61 @@
       border-color: var(--text-primary);
       box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--text-muted);
     }
+    .multi-select-container {
+      position: relative;
+    }
+    .multi-select-toggle {
+      width: 100%;
+      padding: 6px 10px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .multi-select-toggle:hover {
+      border-color: var(--text-muted);
+    }
+    .multi-select-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 6px;
+      z-index: 100;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 2px;
+    }
+    .multi-select-dropdown.visible {
+      display: block;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 11px;
+      border-radius: 3px;
+    }
+    .checkbox-item:hover {
+      background: var(--bg-primary);
+    }
+    .checkbox-item input[type="checkbox"] {
+      margin: 0;
+      cursor: pointer;
+    }
+    .filter-count {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
     /* Export Panel */
     .export-panel {
       margin-bottom: 14px;
@@ -1014,32 +1069,38 @@
     </div>
     
     <div class="control-group">
-      <label>Filter Systems</label>
-      <select id="categoryFilter">
-        <option value="All">All Categories</option>
-        <option value="Commercial">Commercial</option>
-        <option value="Government">Government</option>
-        <option value="EU Research">EU Research</option>
-        <option value="University">University</option>
-        <option value="Open Source">Open Source</option>
-        <option value="AI/Emerging">AI/Emerging</option>
-      </select>
+      <label>Filter Systems <span class="filter-count" id="catFilterCount"></span></label>
+      <div class="multi-select-container" id="categoryFilterContainer">
+        <button class="multi-select-toggle" onclick="toggleMultiSelect('categoryFilter')">All Categories ▾</button>
+        <div class="multi-select-dropdown" id="categoryFilterDropdown">
+          <label class="checkbox-item"><input type="checkbox" value="All" checked onchange="handleCategoryFilter(this)"> All Categories</label>
+          <label class="checkbox-item"><input type="checkbox" value="Commercial" onchange="handleCategoryFilter(this)"> Commercial</label>
+          <label class="checkbox-item"><input type="checkbox" value="Government" onchange="handleCategoryFilter(this)"> Government</label>
+          <label class="checkbox-item"><input type="checkbox" value="EU Research" onchange="handleCategoryFilter(this)"> EU Research</label>
+          <label class="checkbox-item"><input type="checkbox" value="University" onchange="handleCategoryFilter(this)"> University</label>
+          <label class="checkbox-item"><input type="checkbox" value="Open Source" onchange="handleCategoryFilter(this)"> Open Source</label>
+          <label class="checkbox-item"><input type="checkbox" value="AI/Emerging" onchange="handleCategoryFilter(this)"> AI/Emerging</label>
+        </div>
+      </div>
     </div>
     
     <div class="control-group">
-      <label>Filter Capabilities</label>
-      <select id="capGroupFilter">
-        <option value="All">All Groups</option>
-        <option value="Data Input">Data Input</option>
-        <option value="Rule Definition">Rule Definition</option>
-        <option value="Checking Types">Checking Types</option>
-        <option value="AI/ML">AI/ML</option>
-        <option value="Semantic">Semantic</option>
-        <option value="Output">Output</option>
-        <option value="Integration">Integration</option>
-        <option value="Workflow">Workflow</option>
-        <option value="Standards">Standards</option>
-      </select>
+      <label>Filter Capabilities <span class="filter-count" id="capFilterCount"></span></label>
+      <div class="multi-select-container" id="capGroupFilterContainer">
+        <button class="multi-select-toggle" onclick="toggleMultiSelect('capGroupFilter')">All Groups ▾</button>
+        <div class="multi-select-dropdown" id="capGroupFilterDropdown">
+          <label class="checkbox-item"><input type="checkbox" value="All" checked onchange="handleCapGroupFilter(this)"> All Groups</label>
+          <label class="checkbox-item"><input type="checkbox" value="Data Input" onchange="handleCapGroupFilter(this)"> Data Input</label>
+          <label class="checkbox-item"><input type="checkbox" value="Rule Definition" onchange="handleCapGroupFilter(this)"> Rule Definition</label>
+          <label class="checkbox-item"><input type="checkbox" value="Checking Types" onchange="handleCapGroupFilter(this)"> Checking Types</label>
+          <label class="checkbox-item"><input type="checkbox" value="AI/ML" onchange="handleCapGroupFilter(this)"> AI/ML</label>
+          <label class="checkbox-item"><input type="checkbox" value="Semantic" onchange="handleCapGroupFilter(this)"> Semantic</label>
+          <label class="checkbox-item"><input type="checkbox" value="Output" onchange="handleCapGroupFilter(this)"> Output</label>
+          <label class="checkbox-item"><input type="checkbox" value="Integration" onchange="handleCapGroupFilter(this)"> Integration</label>
+          <label class="checkbox-item"><input type="checkbox" value="Workflow" onchange="handleCapGroupFilter(this)"> Workflow</label>
+          <label class="checkbox-item"><input type="checkbox" value="Standards" onchange="handleCapGroupFilter(this)"> Standards</label>
+        </div>
+      </div>
     </div>
 
     <div class="control-group">
@@ -1345,8 +1406,8 @@
     var svg, simulation, nodeG, linkG, nodes, links, linkElements, nodeElements;
     var currentLayoutMode = "force";
     var currentViewMode = "all";
-    var currentCategoryFilter = "All";
-    var currentCapGroupFilter = "All";
+    var currentCategoryFilter = ["All"];
+    var currentCapGroupFilter = ["All"];
     var currentMinScore = 0.5;
     var clusterStrength = 0.35;
     var linkStrengthVal = 0.15;
@@ -1550,19 +1611,24 @@
     }
 
     function updateFilterDropdowns() {
-      // Update category filter
-      var catFilter = document.getElementById("categoryFilter");
-      catFilter.innerHTML = '<option value="All">All Categories</option>';
+      // Update category filter checkboxes
+      var catDropdown = document.getElementById("categoryFilterDropdown");
+      catDropdown.innerHTML = '<label class="checkbox-item"><input type="checkbox" value="All" checked onchange="handleCategoryFilter(this)"> All Categories</label>';
       categoryOrder.forEach(function(cat) {
-        catFilter.innerHTML += '<option value="' + cat + '">' + cat + '</option>';
+        catDropdown.innerHTML += '<label class="checkbox-item"><input type="checkbox" value="' + cat + '" onchange="handleCategoryFilter(this)"> ' + cat + '</label>';
       });
       
-      // Update capability group filter
-      var groupFilter = document.getElementById("capGroupFilter");
-      groupFilter.innerHTML = '<option value="All">All Groups</option>';
+      // Update capability group filter checkboxes
+      var groupDropdown = document.getElementById("capGroupFilterDropdown");
+      groupDropdown.innerHTML = '<label class="checkbox-item"><input type="checkbox" value="All" checked onchange="handleCapGroupFilter(this)"> All Groups</label>';
       groupOrder.forEach(function(grp) {
-        groupFilter.innerHTML += '<option value="' + grp + '">' + grp + '</option>';
+        groupDropdown.innerHTML += '<label class="checkbox-item"><input type="checkbox" value="' + grp + '" onchange="handleCapGroupFilter(this)"> ' + grp + '</label>';
       });
+      
+      // Reset filter state
+      currentCategoryFilter = ["All"];
+      currentCapGroupFilter = ["All"];
+      updateFilterButtons();
     }
 
     function downloadTemplate() {
@@ -1845,13 +1911,15 @@
       var graphNodes = [];
       var graphLinks = [];
 
-      var filteredSystems = currentCategoryFilter === "All" 
+      var filteredSystems = currentCategoryFilter.indexOf("All") >= 0
         ? systemsData 
-        : systemsData.filter(function(s) { return s.category === currentCategoryFilter; });
+        : systemsData.filter(function(s) { return currentCategoryFilter.indexOf(s.category) >= 0; });
 
-      var filteredCapIndices = currentCapGroupFilter === "All"
+      var filteredCapIndices = currentCapGroupFilter.indexOf("All") >= 0
         ? capabilityNames.map(function(_, i) { return i; })
-        : (capabilityGroups[currentCapGroupFilter] || []);
+        : currentCapGroupFilter.reduce(function(acc, group) {
+            return acc.concat(capabilityGroups[group] || []);
+          }, []);
 
       // Add systems
       if (currentViewMode !== "capabilities") {
@@ -2549,14 +2617,122 @@
       buildAndRender();
     });
 
-    document.getElementById("categoryFilter").addEventListener("change", function(e) {
-      currentCategoryFilter = e.target.value;
-      buildAndRender();
-    });
+    function toggleMultiSelect(id) {
+      var dropdown = document.getElementById(id + "Dropdown");
+      var allDropdowns = document.querySelectorAll(".multi-select-dropdown");
+      
+      // Close other dropdowns
+      allDropdowns.forEach(function(dd) {
+        if (dd.id !== id + "Dropdown") {
+          dd.classList.remove("visible");
+        }
+      });
+      
+      dropdown.classList.toggle("visible");
+    }
 
-    document.getElementById("capGroupFilter").addEventListener("change", function(e) {
-      currentCapGroupFilter = e.target.value;
+    function handleCategoryFilter(checkbox) {
+      var container = document.getElementById("categoryFilterDropdown");
+      var allCheckbox = container.querySelector('input[value="All"]');
+      var otherCheckboxes = container.querySelectorAll('input:not([value="All"])');
+      
+      if (checkbox.value === "All") {
+        // If "All" is checked, uncheck others
+        if (checkbox.checked) {
+          otherCheckboxes.forEach(function(cb) { cb.checked = false; });
+          currentCategoryFilter = ["All"];
+        } else {
+          checkbox.checked = true; // Keep at least one selected
+        }
+      } else {
+        // If specific category is checked
+        if (checkbox.checked) {
+          allCheckbox.checked = false;
+          if (currentCategoryFilter.indexOf("All") >= 0) {
+            currentCategoryFilter = [];
+          }
+          currentCategoryFilter.push(checkbox.value);
+        } else {
+          var idx = currentCategoryFilter.indexOf(checkbox.value);
+          if (idx >= 0) currentCategoryFilter.splice(idx, 1);
+          
+          // If none selected, check "All"
+          if (currentCategoryFilter.length === 0) {
+            allCheckbox.checked = true;
+            currentCategoryFilter = ["All"];
+          }
+        }
+      }
+      
+      updateFilterButtons();
       buildAndRender();
+    }
+
+    function handleCapGroupFilter(checkbox) {
+      var container = document.getElementById("capGroupFilterDropdown");
+      var allCheckbox = container.querySelector('input[value="All"]');
+      var otherCheckboxes = container.querySelectorAll('input:not([value="All"])');
+      
+      if (checkbox.value === "All") {
+        if (checkbox.checked) {
+          otherCheckboxes.forEach(function(cb) { cb.checked = false; });
+          currentCapGroupFilter = ["All"];
+        } else {
+          checkbox.checked = true;
+        }
+      } else {
+        if (checkbox.checked) {
+          allCheckbox.checked = false;
+          if (currentCapGroupFilter.indexOf("All") >= 0) {
+            currentCapGroupFilter = [];
+          }
+          currentCapGroupFilter.push(checkbox.value);
+        } else {
+          var idx = currentCapGroupFilter.indexOf(checkbox.value);
+          if (idx >= 0) currentCapGroupFilter.splice(idx, 1);
+          
+          if (currentCapGroupFilter.length === 0) {
+            allCheckbox.checked = true;
+            currentCapGroupFilter = ["All"];
+          }
+        }
+      }
+      
+      updateFilterButtons();
+      buildAndRender();
+    }
+
+    function updateFilterButtons() {
+      // Update category filter button text
+      var catBtn = document.querySelector("#categoryFilterContainer .multi-select-toggle");
+      var catCount = document.getElementById("catFilterCount");
+      if (currentCategoryFilter.indexOf("All") >= 0) {
+        catBtn.textContent = "All Categories ▾";
+        catCount.textContent = "";
+      } else {
+        catBtn.textContent = currentCategoryFilter.length + " selected ▾";
+        catCount.textContent = "(" + currentCategoryFilter.length + ")";
+      }
+      
+      // Update capability filter button text
+      var capBtn = document.querySelector("#capGroupFilterContainer .multi-select-toggle");
+      var capCount = document.getElementById("capFilterCount");
+      if (currentCapGroupFilter.indexOf("All") >= 0) {
+        capBtn.textContent = "All Groups ▾";
+        capCount.textContent = "";
+      } else {
+        capBtn.textContent = currentCapGroupFilter.length + " selected ▾";
+        capCount.textContent = "(" + currentCapGroupFilter.length + ")";
+      }
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener("click", function(e) {
+      if (!e.target.closest(".multi-select-container")) {
+        document.querySelectorAll(".multi-select-dropdown").forEach(function(dd) {
+          dd.classList.remove("visible");
+        });
+      }
     });
 
     document.getElementById("minScore").addEventListener("change", function(e) {
