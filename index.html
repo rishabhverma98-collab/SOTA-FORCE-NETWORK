@@ -1403,14 +1403,229 @@
       var file = event.target.files[0];
       if (!file) return;
       showDataStatus("Loading...", "info");
+      
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+          
+          // Check required sheets
+          var requiredSheets = ['Systems', 'Capabilities', 'Scores'];
+          var missingSheets = requiredSheets.filter(function(s) {
+            return workbook.SheetNames.indexOf(s) === -1;
+          });
+          
+          if (missingSheets.length > 0) {
+            showDataStatus("Missing sheets: " + missingSheets.join(", "), "error");
+            return;
+          }
+          
+          // Parse Systems sheet
+          var systemsSheet = XLSX.utils.sheet_to_json(workbook.Sheets['Systems']);
+          var newSystems = [];
+          var systemIdMap = {};
+          
+          systemsSheet.forEach(function(row, idx) {
+            var sysId = row['ID'] || row['id'] || 'S' + (idx + 1).toString().padStart(2, '0');
+            systemIdMap[sysId] = idx;
+            newSystems.push({
+              id: sysId,
+              name: row['Name'] || row['name'] || 'System ' + (idx + 1),
+              category: row['Category'] || row['category'] || 'Commercial',
+              desc: row['Description'] || row['description'] || '',
+              source: row['Source'] || row['source'] || '',
+              scores: []
+            });
+          });
+          
+          // Parse Capabilities sheet
+          var capsSheet = XLSX.utils.sheet_to_json(workbook.Sheets['Capabilities']);
+          var newCapNames = [];
+          var newCapDescs = [];
+          var newCapGroups = {};
+          var capIdMap = {};
+          
+          capsSheet.forEach(function(row, idx) {
+            var capId = row['ID'] || row['id'] || 'C' + (idx + 1).toString().padStart(2, '0');
+            capIdMap[capId] = idx;
+            newCapNames.push(row['Name'] || row['name'] || 'Capability ' + (idx + 1));
+            newCapDescs.push(row['Description'] || row['description'] || '');
+            var group = row['Group'] || row['group'] || 'Other';
+            if (!newCapGroups[group]) newCapGroups[group] = [];
+            newCapGroups[group].push(idx);
+          });
+          
+          // Parse Scores sheet
+          var scoresSheet = XLSX.utils.sheet_to_json(workbook.Sheets['Scores']);
+          
+          // Initialize scores arrays
+          newSystems.forEach(function(sys) {
+            sys.scores = new Array(newCapNames.length).fill(0);
+          });
+          
+          // Fill in scores
+          scoresSheet.forEach(function(row) {
+            var sysId = row['System \\ Capability'] || row['System'] || row['system'] || row['ID'] || row['id'];
+            var sysIdx = systemIdMap[sysId];
+            
+            if (sysIdx !== undefined) {
+              Object.keys(row).forEach(function(key) {
+                if (key !== 'System \\ Capability' && key !== 'System' && key !== 'system' && key !== 'ID' && key !== 'id') {
+                  var capIdx = capIdMap[key];
+                  if (capIdx !== undefined) {
+                    var val = parseFloat(row[key]);
+                    if (!isNaN(val)) {
+                      newSystems[sysIdx].scores[capIdx] = val;
+                    }
+                  }
+                }
+              });
+            }
+          });
+          
+          // Update global data
+          systemsData = newSystems;
+          capabilityNames = newCapNames;
+          capabilityDescs = newCapDescs;
+          capabilityGroups = newCapGroups;
+          
+          // Rebuild capabilityGroupsArray
+          capabilityGroupsArray = [];
+          for (var group in capabilityGroups) {
+            capabilityGroups[group].forEach(function(idx) {
+              capabilityGroupsArray[idx] = group;
+            });
+          }
+          
+          // Update category and group order
+          var newCategories = [];
+          newSystems.forEach(function(sys) {
+            if (newCategories.indexOf(sys.category) === -1) {
+              newCategories.push(sys.category);
+            }
+          });
+          categoryOrder = newCategories;
+          groupOrder = Object.keys(newCapGroups);
+          
+          // Assign colors to new categories
+          var defaultColors = ['#777', '#888', '#666', '#999', '#555', '#aaa', '#707070', '#909090', '#606060'];
+          categoryOrder.forEach(function(cat, idx) {
+            if (!categoryColors[cat]) {
+              categoryColors[cat] = defaultColors[idx % defaultColors.length];
+            }
+          });
+          
+          // Assign colors to new groups
+          groupOrder.forEach(function(grp, idx) {
+            if (!groupColors[grp]) {
+              groupColors[grp] = defaultColors[idx % defaultColors.length];
+            }
+          });
+          
+          // Update filter dropdowns
+          updateFilterDropdowns();
+          
+          // Rebuild graph
+          buildAndRender();
+          
+          showDataStatus("Loaded: " + newSystems.length + " systems, " + newCapNames.length + " capabilities", "success");
+          
+        } catch (err) {
+          console.error(err);
+          showDataStatus("Error: " + err.message, "error");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function updateFilterDropdowns() {
+      // Update category filter
+      var catFilter = document.getElementById("categoryFilter");
+      catFilter.innerHTML = '<option value="All">All Categories</option>';
+      categoryOrder.forEach(function(cat) {
+        catFilter.innerHTML += '<option value="' + cat + '">' + cat + '</option>';
+      });
+      
+      // Update capability group filter
+      var groupFilter = document.getElementById("capGroupFilter");
+      groupFilter.innerHTML = '<option value="All">All Groups</option>';
+      groupOrder.forEach(function(grp) {
+        groupFilter.innerHTML += '<option value="' + grp + '">' + grp + '</option>';
+      });
     }
 
     function downloadTemplate() {
-      showDataStatus("Template download (demo)", "info");
+      // Create template workbook
+      var wb = XLSX.utils.book_new();
+      
+      // Systems sheet
+      var systemsData_template = [
+        { ID: 'S01', Name: 'System Name', Category: 'Commercial', Description: 'Description here', Source: 'https://example.com' }
+      ];
+      var ws1 = XLSX.utils.json_to_sheet(systemsData_template);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Systems');
+      
+      // Capabilities sheet
+      var capsData = [
+        { ID: 'C01', Name: 'Capability Name', Group: 'Group Name', Description: 'Description here' }
+      ];
+      var ws2 = XLSX.utils.json_to_sheet(capsData);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Capabilities');
+      
+      // Scores sheet
+      var scoresData = [
+        { 'System \\ Capability': 'S01', 'C01': 1 }
+      ];
+      var ws3 = XLSX.utils.json_to_sheet(scoresData);
+      XLSX.utils.book_append_sheet(wb, ws3, 'Scores');
+      
+      XLSX.writeFile(wb, 'network_template.xlsx');
+      showDataStatus("Template downloaded", "success");
     }
 
     function downloadCurrentData() {
-      showDataStatus("Data saved (demo)", "success");
+      // Export current data to Excel
+      var wb = XLSX.utils.book_new();
+      
+      // Systems sheet
+      var sysExport = systemsData.map(function(sys) {
+        return {
+          ID: sys.id,
+          Name: sys.name,
+          Category: sys.category,
+          Description: sys.desc,
+          Source: sys.source || ''
+        };
+      });
+      var ws1 = XLSX.utils.json_to_sheet(sysExport);
+      XLSX.utils.book_append_sheet(wb, ws1, 'Systems');
+      
+      // Capabilities sheet
+      var capsExport = capabilityNames.map(function(name, idx) {
+        return {
+          ID: 'C' + (idx + 1).toString().padStart(2, '0'),
+          Name: name,
+          Group: capabilityGroupsArray[idx] || 'Other',
+          Description: capabilityDescs[idx] || ''
+        };
+      });
+      var ws2 = XLSX.utils.json_to_sheet(capsExport);
+      XLSX.utils.book_append_sheet(wb, ws2, 'Capabilities');
+      
+      // Scores sheet
+      var scoresExport = systemsData.map(function(sys) {
+        var row = { 'System \\ Capability': sys.id };
+        capabilityNames.forEach(function(cap, idx) {
+          row['C' + (idx + 1).toString().padStart(2, '0')] = sys.scores[idx] || 0;
+        });
+        return row;
+      });
+      var ws3 = XLSX.utils.json_to_sheet(scoresExport);
+      XLSX.utils.book_append_sheet(wb, ws3, 'Scores');
+      
+      XLSX.writeFile(wb, 'network_data.xlsx');
+      showDataStatus("Data exported", "success");
     }
 
     function clearSearch() {
