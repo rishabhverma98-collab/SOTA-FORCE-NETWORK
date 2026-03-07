@@ -797,7 +797,6 @@
       fill: var(--text-primary);
       pointer-events: none;
       font-weight: 500;
-      text-anchor: middle;
     }
     .node.dimmed { opacity: 0.08; }
     .link {
@@ -824,16 +823,15 @@
     g.node text {
       fill: var(--text-primary);
       pointer-events: none;
-      text-anchor: middle;
       font-weight: 500;
-      font-size: 8px;
     }
     g.node text.outer-label {
-      font-size: 10px;
       font-weight: 500;
+      dominant-baseline: middle;
     }
     g.node text.inner-label {
       font-weight: 600;
+      font-size: 8px;
     }
     /* Mobile */
     @media (max-width: 768px) {
@@ -1122,6 +1120,16 @@
       <input type="range" id="textOffset" min="5" max="50" step="1" value="20">
     </div>
 
+    <div class="slider-group" id="textWidthGroup" style="display:none;">
+      <label>Text Width <span id="textWidthVal">12</span> chars</label>
+      <input type="range" id="textMaxWidth" min="6" max="30" step="1" value="12">
+    </div>
+
+    <div class="slider-group" id="textSizeGroup" style="display:none;">
+      <label>Text Size <span id="textSizeVal">10</span>px</label>
+      <input type="range" id="outerTextSize" min="6" max="24" step="1" value="10">
+    </div>
+
     <div class="border-legend">
       <div class="legend-title">Node Types</div>
       <div class="border-legend-item">
@@ -1353,6 +1361,8 @@
     var textOffset = 20;
     var nodeStrokeWidth = 2;
     var lineColor = "#888";
+    var textMaxWidth = 12; // max characters per line
+    var outerTextSize = 10;
     var gapThreshold = 0.2;
     var infoPanelPinned = false;
     var currentPinnedNode = null;
@@ -2027,6 +2037,17 @@
           }
         });
 
+      // Initialize positions and angles BEFORE rendering for radial layouts
+      if (currentLayoutMode === "radial" || currentLayoutMode === "dualring") {
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+        nodes.forEach(function(d) {
+          var target = getClusterCenter(d, width, height);
+          d.x = target.x;
+          d.y = target.y;
+        });
+      }
+
       var isLight = document.body.classList.contains("light-mode");
       nodeElements.append("circle")
         .attr("r", function(d) { return d.radius; })
@@ -2038,13 +2059,100 @@
 
       // Text rendering - different for dualring mode
       if (currentLayoutMode === "dualring") {
-        // Outer ring (systems): radially aligned text outside
-        nodeElements.filter(function(d) { return d.type === "system"; })
+        // Outer ring (systems): radially aligned text outside with wrapping
+        var outerLabels = nodeElements.filter(function(d) { return d.type === "system"; })
           .append("text")
           .attr("class", "outer-label")
-          .attr("font-size", 10)
-          .attr("fill", "var(--text-primary)")
-          .text(function(d) { return d.name; });
+          .attr("font-size", outerTextSize)
+          .attr("fill", "var(--text-primary)");
+        
+        // Add tspan elements for each line
+        outerLabels.each(function(d) {
+          var text = d3.select(this);
+          var name = d.name;
+          
+          // Split on spaces, or if no spaces, split by camelCase/special chars
+          var words;
+          if (name.indexOf(' ') >= 0) {
+            words = name.split(' ');
+          } else {
+            // Split camelCase and special characters, keeping them together better
+            words = name.split(/(?=[A-Z][a-z])|[\.\-_\/]+/).filter(function(w) { return w.length > 0; });
+          }
+          
+          // Build lines respecting max width
+          var lines = [];
+          var currentLine = "";
+          
+          words.forEach(function(word) {
+            if (currentLine === "") {
+              currentLine = word;
+            } else if (currentLine.length + 1 + word.length <= textMaxWidth) {
+              currentLine += " " + word;
+            } else {
+              lines.push(currentLine);
+              currentLine = word;
+            }
+          });
+          if (currentLine) lines.push(currentLine);
+          
+          // If any line is still too long, force break
+          var finalLines = [];
+          lines.forEach(function(line) {
+            while (line.length > textMaxWidth + 2) { // Allow slight overflow
+              finalLines.push(line.slice(0, textMaxWidth));
+              line = line.slice(textMaxWidth);
+            }
+            if (line) finalLines.push(line);
+          });
+          
+          d.textLines = finalLines.length > 0 ? finalLines : [name];
+          
+          // Calculate initial position based on screen position
+          var screenWidth = window.innerWidth;
+          var cx = screenWidth / 2;
+          var cy = window.innerHeight / 2;
+          
+          // Calculate angle from actual position
+          var dx = d.x - cx;
+          var dy = d.y - cy;
+          var angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+          
+          // Flip condition: when angle is in the left half of circle
+          var flip = Math.abs(angleDeg) > 90;
+          
+          var nodeRadius = outerNodeSize + nodeStrokeWidth;
+          var offset = nodeRadius + textOffset;
+          
+          var rotation, xPos, anchor;
+          
+          if (flip) {
+            // Left side: rotate by angle+180, position text outside, anchor at end
+            rotation = angleDeg + 180;
+            xPos = -offset;
+            anchor = "end";
+          } else {
+            rotation = angleDeg;
+            xPos = offset;
+            anchor = "start";
+          }
+          
+          // Create tspans with initial positioning
+          var numLines = d.textLines.length;
+          var lineHeight = 1.1;
+          var startDy = -((numLines - 1) * lineHeight / 2);
+          
+          d.textLines.forEach(function(line, i) {
+            text.append("tspan")
+              .attr("x", xPos)
+              .attr("dy", i === 0 ? (startDy + 0.35) + "em" : lineHeight + "em")
+              .text(line);
+          });
+          
+          // Set initial transform and anchor
+          text.attr("transform", "rotate(" + rotation + ")");
+          text.attr("text-anchor", anchor);
+        });
         
         // Inner ring (capabilities): text inside node, auto-scaled
         nodeElements.filter(function(d) { return d.type === "capability"; })
@@ -2075,17 +2183,6 @@
 
       simulation.nodes(nodes);
       simulation.force("link", d3.forceLink(links).id(function(d) { return d.id; }).distance(80).strength(linkStrengthVal));
-
-      // Initialize positions and angles for radial layouts
-      if (currentLayoutMode === "radial" || currentLayoutMode === "dualring") {
-        var width = window.innerWidth;
-        var height = window.innerHeight;
-        nodes.forEach(function(d) {
-          var target = getClusterCenter(d, width, height);
-          d.x = target.x;
-          d.y = target.y;
-        });
-      }
 
       simulation.on("tick", function() {
         var alpha = simulation.alpha();
@@ -2122,29 +2219,54 @@
         
         // Update radial text positioning for dualring mode
         if (currentLayoutMode === "dualring") {
-          nodeG.selectAll("text.outer-label")
-            .attr("transform", function(d) {
-              var angle = (d.angle || 0) * 180 / Math.PI;
-              // Flip text on left side so it's readable
-              var flip = (d.angle > Math.PI / 2 || d.angle < -Math.PI / 2);
-              if (flip) {
-                return "rotate(" + (angle + 180) + ")";
-              }
-              return "rotate(" + angle + ")";
-            })
-            .attr("x", function(d) {
-              var flip = (d.angle > Math.PI / 2 || d.angle < -Math.PI / 2);
-              // Get actual node radius from the circle element
-              var nodeRadius = outerNodeSize + nodeStrokeWidth; // Add stroke width
-              var offset = nodeRadius + textOffset;
-              return flip ? -offset : offset;
-            })
-            .attr("y", 0)
-            .attr("dy", "0.35em")
-            .attr("text-anchor", function(d) {
-              var flip = (d.angle > Math.PI / 2 || d.angle < -Math.PI / 2);
-              return flip ? "end" : "start";
-            });
+          var cx = width / 2;
+          var cy = height / 2;
+          
+          nodeG.selectAll("text.outer-label").each(function(d) {
+            var text = d3.select(this);
+            
+            // Calculate angle from center to node
+            var dx = d.x - cx;
+            var dy = d.y - cy;
+            var angleRad = Math.atan2(dy, dx);
+            var angleDeg = angleRad * 180 / Math.PI;
+            
+            // Flip condition: when angle is in the left half of circle
+            // Left half is when absolute angle > 90 degrees
+            var flip = Math.abs(angleDeg) > 90;
+            
+            // Calculate offset from node center
+            var nodeRadius = outerNodeSize + nodeStrokeWidth;
+            var offset = nodeRadius + textOffset;
+            
+            var rotation, xPos, anchor;
+            
+            if (flip) {
+              // Left side: rotate by angle+180, position text outside, anchor at end
+              rotation = angleDeg + 180;
+              xPos = -offset;
+              anchor = "end";
+            } else {
+              // Right side: rotate by angle
+              rotation = angleDeg;
+              xPos = offset;
+              anchor = "start";
+            }
+            
+            text.attr("transform", "rotate(" + rotation + ")");
+            text.attr("text-anchor", anchor);
+            
+            // Update tspan positions for multi-line text
+            var numLines = d.textLines ? d.textLines.length : 1;
+            var lineHeight = 1.1;
+            var startDy = -((numLines - 1) * lineHeight / 2);
+            
+            text.selectAll("tspan")
+              .attr("x", xPos)
+              .attr("dy", function(td, i) {
+                return i === 0 ? (startDy + 0.35) + "em" : lineHeight + "em";
+              });
+          });
         }
       });
 
@@ -2417,6 +2539,8 @@
       document.getElementById("outerNodeSizeGroup").style.display = isDualRing ? "block" : "none";
       document.getElementById("innerNodeSizeGroup").style.display = isDualRing ? "block" : "none";
       document.getElementById("textOffsetGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("textWidthGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("textSizeGroup").style.display = isDualRing ? "block" : "none";
       buildAndRender();
     });
 
@@ -2531,6 +2655,23 @@
       textOffset = parseFloat(e.target.value);
       document.getElementById("textOffsetVal").textContent = e.target.value;
       simulation.alpha(0.3).restart();
+    });
+
+    document.getElementById("textMaxWidth").addEventListener("input", function(e) {
+      textMaxWidth = parseInt(e.target.value);
+      document.getElementById("textWidthVal").textContent = e.target.value;
+      buildAndRender();
+    });
+
+    document.getElementById("outerTextSize").addEventListener("input", function(e) {
+      outerTextSize = parseInt(e.target.value);
+      document.getElementById("textSizeVal").textContent = e.target.value;
+      if (nodeG) {
+        nodeG.selectAll("text.outer-label")
+          .attr("font-size", outerTextSize)
+          .selectAll("tspan")
+          .attr("font-size", outerTextSize);
+      }
     });
 
     document.getElementById("gapThreshold").addEventListener("input", function(e) {
