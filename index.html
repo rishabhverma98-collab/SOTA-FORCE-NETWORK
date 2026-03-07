@@ -1140,6 +1140,11 @@
     </div>
 
     <div class="slider-group">
+      <label>Arc Thickness <span id="arcThicknessVal">1</span></label>
+      <input type="range" id="arcThickness" min="0.5" max="6" step="0.5" value="1">
+    </div>
+
+    <div class="slider-group">
       <label>Node Stroke <span id="nodeStrokeVal">0.5</span></label>
       <input type="range" id="nodeStrokeWidth" min="0" max="8" step="0.5" value="0.5">
     </div>
@@ -1419,7 +1424,7 @@
     }
 
     // === STATE ===
-    var svg, simulation, nodeG, linkG, nodes, links, linkElements, nodeElements;
+    var svg, simulation, nodeG, linkG, dividerG, nodes, links, linkElements, nodeElements;
     var currentLayoutMode = "dualring";
     var currentViewMode = "all";
     var currentCategoryFilter = ["All"];
@@ -1441,6 +1446,7 @@
     var textMaxWidth = 18; // max characters per line
     var outerTextSize = 14;
     var highlightedLineThickness = 3;
+    var arcThickness = 1;
     var gapThreshold = 0.2;
     var infoPanelPinned = false;
     var currentPinnedNode = null;
@@ -1803,13 +1809,153 @@
       });
     }
 
+    function drawRadialDividers(width, height) {
+      var cx = width / 2;
+      var cy = height / 2;
+      var radius = Math.min(width, height) * outerRingRadius;
+      var rotRad = outerRingRotation * Math.PI / 180;
+      
+      // Get filtered data to match what's actually rendered
+      var filteredSystems = systemsData.filter(function(sys) {
+        if (currentCategoryFilter.indexOf("All") >= 0) return true;
+        return currentCategoryFilter.indexOf(sys.category) >= 0;
+      });
+      
+      var filteredCapIndices = [];
+      for (var i = 0; i < capabilityNames.length; i++) {
+        if (currentCapGroupFilter.indexOf("All") >= 0 || currentCapGroupFilter.indexOf(getCapGroup(i)) >= 0) {
+          filteredCapIndices.push(i);
+        }
+      }
+      
+      // Build sorted node list matching radial layout logic
+      var sortedNodes = [];
+      
+      // Systems first, sorted by category
+      var systems = filteredSystems.slice().sort(function(a, b) {
+        return categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+      });
+      systems.forEach(function(sys) {
+        sortedNodes.push({ id: sys.id, type: "system", category: sys.category, group: null });
+      });
+      
+      // Then capabilities, sorted by group
+      var caps = filteredCapIndices.slice().sort(function(a, b) {
+        return groupOrder.indexOf(getCapGroup(a)) - groupOrder.indexOf(getCapGroup(b));
+      });
+      caps.forEach(function(idx) {
+        sortedNodes.push({ id: "C" + idx, type: "capability", category: null, group: getCapGroup(idx) });
+      });
+      
+      if (sortedNodes.length === 0) return;
+      
+      // Build arc segments for each group
+      var arcSegments = [];
+      var currentSegment = null;
+      
+      sortedNodes.forEach(function(node, idx) {
+        var angle = (idx / sortedNodes.length) * Math.PI * 2 - Math.PI / 2 + rotRad;
+        
+        if (idx === 0) {
+          currentSegment = {
+            type: node.type,
+            category: node.category,
+            group: node.group,
+            startIdx: idx,
+            startAngle: angle
+          };
+          return;
+        }
+        
+        var isNewSegment = false;
+        
+        // Check for type change (systems -> capabilities)
+        if (node.type !== currentSegment.type) {
+          isNewSegment = true;
+        }
+        // Check for category change within systems
+        else if (node.type === "system" && node.category !== currentSegment.category) {
+          isNewSegment = true;
+        }
+        // Check for group change within capabilities
+        else if (node.type === "capability" && node.group !== currentSegment.group) {
+          isNewSegment = true;
+        }
+        
+        if (isNewSegment) {
+          // Close previous segment
+          var prevAngle = ((idx - 1) / sortedNodes.length) * Math.PI * 2 - Math.PI / 2 + rotRad;
+          currentSegment.endIdx = idx - 1;
+          currentSegment.endAngle = prevAngle;
+          arcSegments.push(currentSegment);
+          
+          // Start new segment
+          currentSegment = {
+            type: node.type,
+            category: node.category,
+            group: node.group,
+            startIdx: idx,
+            startAngle: angle
+          };
+        }
+      });
+      
+      // Close final segment
+      var lastAngle = ((sortedNodes.length - 1) / sortedNodes.length) * Math.PI * 2 - Math.PI / 2 + rotRad;
+      currentSegment.endIdx = sortedNodes.length - 1;
+      currentSegment.endAngle = lastAngle;
+      arcSegments.push(currentSegment);
+      
+      // Arc offset from ring
+      var arcOffset = outerNodeSize + 8;
+      var arcRadius = radius + arcOffset;
+      
+      // Draw arcs - from first node center to last node center of each segment
+      arcSegments.forEach(function(seg) {
+        var startAngle = seg.startAngle;
+        var endAngle = seg.endAngle;
+        
+        // Get color based on type
+        var arcColor;
+        if (seg.type === "system") {
+          arcColor = categoryColors[seg.category] || "var(--text-muted)";
+        } else {
+          arcColor = groupColors[seg.group] || "var(--text-muted)";
+        }
+        
+        // Create arc path
+        var x1 = cx + Math.cos(startAngle) * arcRadius;
+        var y1 = cy + Math.sin(startAngle) * arcRadius;
+        var x2 = cx + Math.cos(endAngle) * arcRadius;
+        var y2 = cy + Math.sin(endAngle) * arcRadius;
+        
+        // Determine if arc spans more than 180 degrees
+        var angleDiff = endAngle - startAngle;
+        if (angleDiff < 0) angleDiff += Math.PI * 2;
+        var largeArc = angleDiff > Math.PI ? 1 : 0;
+        
+        var pathD = "M " + x1 + " " + y1 + 
+                    " A " + arcRadius + " " + arcRadius + " 0 " + largeArc + " 1 " + x2 + " " + y2;
+        
+        dividerG.append("path")
+          .attr("class", "group-arc " + seg.type + "-arc")
+          .attr("d", pathD)
+          .attr("fill", "none")
+          .attr("stroke", arcColor)
+          .attr("stroke-width", arcThickness)
+          .attr("stroke-opacity", 1.0)
+          .attr("stroke-linecap", "round");
+      });
+    }
+
     function getClusterCenter(node, width, height) {
       var cx = width / 2;
       var cy = height / 2;
 
       // Radial layout - ALL nodes on single outer ring, grouped by category/group
       if (currentLayoutMode === "radial") {
-        var radius = Math.min(width, height) * 0.38;
+        var radius = Math.min(width, height) * outerRingRadius;
+        var rotRad = outerRingRotation * Math.PI / 180;
         
         // Sort nodes: first systems by category, then capabilities by group
         var sortedNodes = nodes.slice().sort(function(a, b) {
@@ -1822,7 +1968,7 @@
         });
         
         var idx = sortedNodes.findIndex(function(n) { return n.id === node.id; });
-        var angle = (idx / sortedNodes.length) * Math.PI * 2 - Math.PI / 2;
+        var angle = (idx / sortedNodes.length) * Math.PI * 2 - Math.PI / 2 + rotRad;
         node.angle = angle;
         return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
       }
@@ -1950,7 +2096,7 @@
             source: sys.source || "",
             color: categoryColors[sys.category],
             health: calculateSystemHealth(sys),
-            radius: currentLayoutMode === "dualring" ? outerNodeSize : 18
+            radius: (currentLayoutMode === "dualring" || currentLayoutMode === "radial") ? outerNodeSize : 18
           });
         });
       }
@@ -1968,7 +2114,7 @@
             desc: capabilityDescs[idx],
             color: groupColors[getCapGroup(idx)],
             adoption: adoption,
-            radius: currentLayoutMode === "dualring" ? innerNodeSize : 14
+            radius: currentLayoutMode === "dualring" ? innerNodeSize : (currentLayoutMode === "radial" ? outerNodeSize : 14)
           });
         });
       }
@@ -2044,6 +2190,7 @@
 
       var container = svg.append("g");
       linkG = container.append("g").attr("class", "links");
+      dividerG = container.append("g").attr("class", "dividers");
       nodeG = container.append("g").attr("class", "nodes");
 
       simulation = d3.forceSimulation()
@@ -2067,6 +2214,12 @@
 
       linkG.selectAll("*").remove();
       nodeG.selectAll("*").remove();
+      dividerG.selectAll("*").remove();
+
+      // Draw radial dividers for single ring mode
+      if (currentLayoutMode === "radial") {
+        drawRadialDividers(width, height);
+      }
 
       // Links - gray color, solid for full, dashed for partial
       linkElements = linkG.selectAll("path.link")
@@ -2142,10 +2295,17 @@
         })
         .attr("stroke-width", nodeStrokeWidth);
 
-      // Text rendering - different for dualring mode
-      if (currentLayoutMode === "dualring") {
-        // Outer ring (systems): radially aligned text outside with wrapping
-        var outerLabels = nodeElements.filter(function(d) { return d.type === "system"; })
+      // Text rendering - different for dualring and radial modes
+      if (currentLayoutMode === "dualring" || currentLayoutMode === "radial") {
+        // Radially aligned text for both modes
+        // For dualring: systems on outer, caps inside inner
+        // For radial: all nodes get radial text
+        
+        var radialTextNodes = currentLayoutMode === "dualring" 
+          ? nodeElements.filter(function(d) { return d.type === "system"; })
+          : nodeElements; // All nodes for single ring
+        
+        var outerLabels = radialTextNodes
           .append("text")
           .attr("class", "outer-label")
           .attr("font-size", outerTextSize)
@@ -2239,25 +2399,27 @@
           text.attr("text-anchor", anchor);
         });
         
-        // Inner ring (capabilities): text inside node, auto-scaled
-        nodeElements.filter(function(d) { return d.type === "capability"; })
-          .append("text")
-          .attr("class", "inner-label")
-          .attr("dy", "0.35em")
-          .attr("text-anchor", "middle")
-          .attr("font-size", function(d) {
-            // Auto-scale font size to fit inside node
-            var maxWidth = d.radius * 1.6;
-            var textLen = d.name.length;
-            var fontSize = Math.min(10, maxWidth / (textLen * 0.5));
-            return Math.max(5, fontSize);
-          })
-          .attr("fill", "var(--text-primary)")
-          .text(function(d) {
-            // Truncate if needed
-            var maxChars = Math.floor(d.radius / 3);
-            return d.name.length > maxChars ? d.name.slice(0, maxChars - 1) + "…" : d.name;
-          });
+        // Inner ring (capabilities): text inside node, auto-scaled - only for dualring
+        if (currentLayoutMode === "dualring") {
+          nodeElements.filter(function(d) { return d.type === "capability"; })
+            .append("text")
+            .attr("class", "inner-label")
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "middle")
+            .attr("font-size", function(d) {
+              // Auto-scale font size to fit inside node
+              var maxWidth = d.radius * 1.6;
+              var textLen = d.name.length;
+              var fontSize = Math.min(10, maxWidth / (textLen * 0.5));
+              return Math.max(5, fontSize);
+            })
+            .attr("fill", "var(--text-primary)")
+            .text(function(d) {
+              // Truncate if needed
+              var maxChars = Math.floor(d.radius / 3);
+              return d.name.length > maxChars ? d.name.slice(0, maxChars - 1) + "…" : d.name;
+            });
+        }
       } else {
         // Default text rendering for other layouts
         nodeElements.append("text")
@@ -2302,8 +2464,8 @@
         linkElements.attr("d", linkArc);
         nodeElements.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
         
-        // Update radial text positioning for dualring mode
-        if (currentLayoutMode === "dualring") {
+        // Update radial text positioning for dualring and radial modes
+        if (currentLayoutMode === "dualring" || currentLayoutMode === "radial") {
           var cx = width / 2;
           var cy = height / 2;
           
@@ -2621,16 +2783,17 @@
     document.getElementById("layoutMode").addEventListener("change", function(e) {
       currentLayoutMode = e.target.value;
       // Show/hide ring controls based on layout
+      var isRadialMode = currentLayoutMode === "dualring" || currentLayoutMode === "radial";
       var isDualRing = currentLayoutMode === "dualring";
-      document.getElementById("outerRadiusGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("outerRadiusGroup").style.display = isRadialMode ? "block" : "none";
       document.getElementById("innerRadiusGroup").style.display = isDualRing ? "block" : "none";
-      document.getElementById("outerRotationGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("outerRotationGroup").style.display = isRadialMode ? "block" : "none";
       document.getElementById("innerRotationGroup").style.display = isDualRing ? "block" : "none";
-      document.getElementById("outerNodeSizeGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("outerNodeSizeGroup").style.display = isRadialMode ? "block" : "none";
       document.getElementById("innerNodeSizeGroup").style.display = isDualRing ? "block" : "none";
-      document.getElementById("textOffsetGroup").style.display = isDualRing ? "block" : "none";
-      document.getElementById("textWidthGroup").style.display = isDualRing ? "block" : "none";
-      document.getElementById("textSizeGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("textOffsetGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("textWidthGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("textSizeGroup").style.display = isRadialMode ? "block" : "none";
       buildAndRender();
     });
 
@@ -2793,6 +2956,14 @@
       document.getElementById("highlightThicknessVal").textContent = highlightedLineThickness;
     });
 
+    document.getElementById("arcThickness").addEventListener("input", function(e) {
+      arcThickness = parseFloat(e.target.value);
+      document.getElementById("arcThicknessVal").textContent = arcThickness;
+      if (currentLayoutMode === "radial" && dividerG) {
+        dividerG.selectAll(".group-arc").attr("stroke-width", arcThickness);
+      }
+    });
+
     document.getElementById("nodeStrokeWidth").addEventListener("input", function(e) {
       nodeStrokeWidth = parseFloat(e.target.value);
       document.getElementById("nodeStrokeVal").textContent = nodeStrokeWidth;
@@ -2822,6 +2993,10 @@
       outerRingRadius = parseFloat(e.target.value) / 100;
       document.getElementById("outerRadiusVal").textContent = e.target.value + "%";
       simulation.alpha(0.5).restart();
+      if (currentLayoutMode === "radial") {
+        dividerG.selectAll("*").remove();
+        drawRadialDividers(window.innerWidth, window.innerHeight);
+      }
     });
 
     document.getElementById("innerRingRadius").addEventListener("input", function(e) {
@@ -2834,6 +3009,10 @@
       outerRingRotation = parseFloat(e.target.value);
       document.getElementById("outerRotationVal").textContent = e.target.value + "°";
       simulation.alpha(0.5).restart();
+      if (currentLayoutMode === "radial") {
+        dividerG.selectAll("*").remove();
+        drawRadialDividers(window.innerWidth, window.innerHeight);
+      }
     });
 
     document.getElementById("innerRingRotation").addEventListener("input", function(e) {
