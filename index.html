@@ -424,6 +424,21 @@
     .gap-action-btn:hover {
       border-color: var(--accent);
     }
+    .color-btn {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .color-btn:hover {
+      transform: scale(1.1);
+    }
+    .color-btn.active {
+      border-color: var(--text-primary);
+      box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--text-muted);
+    }
     /* Export Panel */
     .export-panel {
       margin-bottom: 14px;
@@ -786,15 +801,13 @@
     }
     .node.dimmed { opacity: 0.08; }
     .link {
-      stroke: #888;
-      transition: stroke-opacity 0.3s, stroke-width 0.3s;
+      transition: stroke-opacity 0.3s, stroke-width 0.3s, stroke 0.3s;
       pointer-events: none;
       fill: none;
     }
     .link.highlighted {
       stroke-opacity: 1 !important;
       stroke-width: 3px !important;
-      stroke: #555 !important;
     }
     .link.dimmed { stroke-opacity: 0.05 !important; }
     .link.full { }
@@ -1053,6 +1066,25 @@
     <div class="slider-group">
       <label>Line Opacity <span id="opacityVal">0.70</span></label>
       <input type="range" id="lineOpacity" min="0.1" max="1" step="0.05" value="0.7">
+    </div>
+
+    <div class="slider-group">
+      <label>Node Stroke <span id="nodeStrokeVal">2</span></label>
+      <input type="range" id="nodeStrokeWidth" min="0" max="8" step="0.5" value="2">
+    </div>
+
+    <div class="control-group">
+      <label>Line Color</label>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button class="color-btn active" data-color="#888" style="background:#888;" onclick="setLineColor('#888')"></button>
+        <button class="color-btn" data-color="#555" style="background:#555;" onclick="setLineColor('#555')"></button>
+        <button class="color-btn" data-color="#aaa" style="background:#aaa;" onclick="setLineColor('#aaa')"></button>
+        <button class="color-btn" data-color="#4a90a4" style="background:#4a90a4;" onclick="setLineColor('#4a90a4')"></button>
+        <button class="color-btn" data-color="#a45a4a" style="background:#a45a4a;" onclick="setLineColor('#a45a4a')"></button>
+        <button class="color-btn" data-color="#6a8a5a" style="background:#6a8a5a;" onclick="setLineColor('#6a8a5a')"></button>
+        <button class="color-btn" data-color="#8a6a9a" style="background:#8a6a9a;" onclick="setLineColor('#8a6a9a')"></button>
+        <input type="color" id="customLineColor" value="#888888" style="width:24px;height:24px;border:none;padding:0;cursor:pointer;border-radius:4px;" onchange="setLineColor(this.value)">
+      </div>
     </div>
 
     <div class="slider-group" id="outerRadiusGroup" style="display:none;">
@@ -1319,6 +1351,8 @@
     var outerNodeSize = 8;
     var innerNodeSize = 18;
     var textOffset = 20;
+    var nodeStrokeWidth = 2;
+    var lineColor = "#888";
     var gapThreshold = 0.2;
     var infoPanelPinned = false;
     var currentPinnedNode = null;
@@ -1731,7 +1765,7 @@
         .append("path")
         .attr("class", function(d) { return "link " + (d.value >= 1 ? "full" : "partial"); })
         .attr("fill", "none")
-        .attr("stroke", "#888")
+        .attr("stroke", lineColor)
         .attr("stroke-width", lineThickness)
         .attr("stroke-opacity", lineOpacity)
         .attr("stroke-dasharray", function(d) { return d.value >= 1 ? null : "6,4"; })
@@ -1785,7 +1819,7 @@
         .attr("stroke", function(d) { 
           return d.type === "system" ? (isLight ? "#000" : "#fff") : (isLight ? "#fff" : "#000");
         })
-        .attr("stroke-width", 2);
+        .attr("stroke-width", nodeStrokeWidth);
 
       // Text rendering - different for dualring mode
       if (currentLayoutMode === "dualring") {
@@ -1886,7 +1920,7 @@
             .attr("x", function(d) {
               var flip = (d.angle > Math.PI / 2 || d.angle < -Math.PI / 2);
               // Get actual node radius from the circle element
-              var nodeRadius = outerNodeSize + 2; // Add stroke width
+              var nodeRadius = outerNodeSize + nodeStrokeWidth; // Add stroke width
               var offset = nodeRadius + textOffset;
               return flip ? -offset : offset;
             })
@@ -2216,6 +2250,31 @@
         linkElements.attr("stroke-opacity", lineOpacity);
       }
     });
+
+    document.getElementById("nodeStrokeWidth").addEventListener("input", function(e) {
+      nodeStrokeWidth = parseFloat(e.target.value);
+      document.getElementById("nodeStrokeVal").textContent = nodeStrokeWidth;
+      if (nodeG) {
+        nodeG.selectAll("circle").attr("stroke-width", nodeStrokeWidth);
+      }
+    });
+
+    function setLineColor(color) {
+      lineColor = color;
+      // Update active button state
+      document.querySelectorAll(".color-btn").forEach(function(btn) {
+        btn.classList.remove("active");
+        if (btn.dataset.color === color) {
+          btn.classList.add("active");
+        }
+      });
+      // Update custom color picker
+      document.getElementById("customLineColor").value = color;
+      // Update link colors - select directly from SVG
+      if (linkG) {
+        linkG.selectAll("path.link").attr("stroke", lineColor);
+      }
+    }
 
     document.getElementById("outerRingRadius").addEventListener("input", function(e) {
       outerRingRadius = parseFloat(e.target.value) / 100;
