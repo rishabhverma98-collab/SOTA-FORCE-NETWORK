@@ -964,6 +964,10 @@
       <button class="data-btn" onclick="document.getElementById('fileInput').click()">Upload Excel</button>
       <button class="data-btn" onclick="downloadTemplate()">Download Template</button>
       <button class="data-btn" onclick="downloadCurrentData()">Save Current Data</button>
+      <div class="data-panel-header" style="margin-top: 12px;">Settings</div>
+      <input type="file" id="settingsInput" accept=".json" style="display:none" onchange="handleSettingsUpload(event)">
+      <button class="data-btn" onclick="document.getElementById('settingsInput').click()">Load Settings</button>
+      <button class="data-btn" onclick="downloadSettings()">Save Settings</button>
       <div class="data-status" id="dataStatus"></div>
     </div>
     
@@ -1725,6 +1729,203 @@
       
       XLSX.writeFile(wb, 'network_data.xlsx');
       showDataStatus("Data exported", "success");
+    }
+
+    function downloadSettings() {
+      var settings = {
+        layoutMode: currentLayoutMode,
+        viewMode: currentViewMode,
+        categoryFilter: currentCategoryFilter,
+        capGroupFilter: currentCapGroupFilter,
+        minScore: currentMinScore,
+        clusterStrength: clusterStrength,
+        lineThickness: lineThickness,
+        lineOpacity: lineOpacity,
+        lineColor: lineColor,
+        highlightedLineThickness: highlightedLineThickness,
+        arcThickness: arcThickness,
+        nodeStrokeWidth: nodeStrokeWidth,
+        outerRingRadius: outerRingRadius,
+        innerRingRadius: innerRingRadius,
+        outerRingRotation: outerRingRotation,
+        innerRingRotation: innerRingRotation,
+        outerNodeSize: outerNodeSize,
+        innerNodeSize: innerNodeSize,
+        textOffset: textOffset,
+        textMaxWidth: textMaxWidth,
+        outerTextSize: outerTextSize,
+        darkMode: !document.body.classList.contains("light-mode")
+      };
+      
+      var blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'network_settings.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showDataStatus("Settings saved", "success");
+    }
+
+    function handleSettingsUpload(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var settings = JSON.parse(e.target.result);
+          applySettings(settings);
+          showDataStatus("Settings loaded", "success");
+        } catch (err) {
+          showDataStatus("Error loading settings: " + err.message, "error");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function applySettings(s) {
+      // Layout mode
+      if (s.layoutMode) {
+        currentLayoutMode = s.layoutMode;
+        document.getElementById("layoutMode").value = s.layoutMode;
+      }
+      
+      // View mode
+      if (s.viewMode) {
+        currentViewMode = s.viewMode;
+        document.getElementById("viewMode").value = s.viewMode;
+      }
+      
+      // Filters
+      if (s.categoryFilter) currentCategoryFilter = s.categoryFilter;
+      if (s.capGroupFilter) currentCapGroupFilter = s.capGroupFilter;
+      if (s.minScore !== undefined) {
+        currentMinScore = s.minScore;
+        document.getElementById("minScore").value = s.minScore;
+      }
+      
+      // Bundling strength
+      if (s.clusterStrength !== undefined) {
+        clusterStrength = s.clusterStrength;
+        document.getElementById("clusterStrength").value = s.clusterStrength;
+        document.getElementById("clusterVal").textContent = s.clusterStrength.toFixed(2);
+      }
+      
+      // Line settings
+      if (s.lineThickness !== undefined) {
+        lineThickness = s.lineThickness;
+        document.getElementById("lineThickness").value = s.lineThickness;
+        document.getElementById("thicknessVal").textContent = s.lineThickness.toFixed(1);
+      }
+      if (s.lineOpacity !== undefined) {
+        lineOpacity = s.lineOpacity;
+        document.getElementById("lineOpacity").value = s.lineOpacity;
+        document.getElementById("opacityVal").textContent = s.lineOpacity.toFixed(2);
+      }
+      if (s.lineColor) {
+        lineColor = s.lineColor;
+        document.getElementById("customLineColor").value = s.lineColor;
+        document.querySelectorAll(".line-color-btn").forEach(function(btn) {
+          btn.classList.toggle("active", btn.dataset.color === s.lineColor);
+        });
+      }
+      if (s.highlightedLineThickness !== undefined) {
+        highlightedLineThickness = s.highlightedLineThickness;
+        document.getElementById("highlightedLineThickness").value = s.highlightedLineThickness;
+        document.getElementById("highlightThicknessVal").textContent = s.highlightedLineThickness;
+      }
+      if (s.arcThickness !== undefined) {
+        arcThickness = s.arcThickness;
+        document.getElementById("arcThickness").value = s.arcThickness;
+        document.getElementById("arcThicknessVal").textContent = s.arcThickness;
+      }
+      if (s.nodeStrokeWidth !== undefined) {
+        nodeStrokeWidth = s.nodeStrokeWidth;
+        document.getElementById("nodeStrokeWidth").value = s.nodeStrokeWidth;
+        document.getElementById("nodeStrokeVal").textContent = s.nodeStrokeWidth;
+      }
+      
+      // Ring settings
+      if (s.outerRingRadius !== undefined) {
+        outerRingRadius = s.outerRingRadius;
+        document.getElementById("outerRingRadius").value = s.outerRingRadius * 100;
+        document.getElementById("outerRadiusVal").textContent = Math.round(s.outerRingRadius * 100) + "%";
+      }
+      if (s.innerRingRadius !== undefined) {
+        innerRingRadius = s.innerRingRadius;
+        document.getElementById("innerRingRadius").value = s.innerRingRadius * 100;
+        document.getElementById("innerRadiusVal").textContent = Math.round(s.innerRingRadius * 100) + "%";
+      }
+      if (s.outerRingRotation !== undefined) {
+        outerRingRotation = s.outerRingRotation;
+        document.getElementById("outerRingRotation").value = s.outerRingRotation;
+        document.getElementById("outerRotationVal").textContent = s.outerRingRotation + "°";
+      }
+      if (s.innerRingRotation !== undefined) {
+        innerRingRotation = s.innerRingRotation;
+        document.getElementById("innerRingRotation").value = s.innerRingRotation;
+        document.getElementById("innerRotationVal").textContent = s.innerRingRotation + "°";
+      }
+      
+      // Node sizes
+      if (s.outerNodeSize !== undefined) {
+        outerNodeSize = s.outerNodeSize;
+        document.getElementById("outerNodeSize").value = s.outerNodeSize;
+        document.getElementById("outerNodeSizeVal").textContent = s.outerNodeSize;
+      }
+      if (s.innerNodeSize !== undefined) {
+        innerNodeSize = s.innerNodeSize;
+        document.getElementById("innerNodeSize").value = s.innerNodeSize;
+        document.getElementById("innerNodeSizeVal").textContent = s.innerNodeSize;
+      }
+      
+      // Text settings
+      if (s.textOffset !== undefined) {
+        textOffset = s.textOffset;
+        document.getElementById("textOffset").value = s.textOffset;
+        document.getElementById("textOffsetVal").textContent = s.textOffset;
+      }
+      if (s.textMaxWidth !== undefined) {
+        textMaxWidth = s.textMaxWidth;
+        document.getElementById("textMaxWidth").value = s.textMaxWidth;
+        document.getElementById("textWidthVal").textContent = s.textMaxWidth;
+      }
+      if (s.outerTextSize !== undefined) {
+        outerTextSize = s.outerTextSize;
+        document.getElementById("outerTextSize").value = s.outerTextSize;
+        document.getElementById("textSizeVal").textContent = s.outerTextSize;
+      }
+      
+      // Dark mode
+      if (s.darkMode !== undefined) {
+        if (s.darkMode) {
+          document.body.classList.remove("light-mode");
+          document.getElementById("modeToggle").textContent = "Light";
+        } else {
+          document.body.classList.add("light-mode");
+          document.getElementById("modeToggle").textContent = "Dark";
+        }
+      }
+      
+      // Show/hide controls based on layout
+      var isRadialMode = currentLayoutMode === "dualring" || currentLayoutMode === "radial";
+      var isDualRing = currentLayoutMode === "dualring";
+      document.getElementById("outerRadiusGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("innerRadiusGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("outerRotationGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("innerRotationGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("outerNodeSizeGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("innerNodeSizeGroup").style.display = isDualRing ? "block" : "none";
+      document.getElementById("textOffsetGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("textWidthGroup").style.display = isRadialMode ? "block" : "none";
+      document.getElementById("textSizeGroup").style.display = isRadialMode ? "block" : "none";
+      
+      // Re-render
+      buildAndRender();
     }
 
     function clearSearch() {
@@ -2689,7 +2890,44 @@
     // Export functions
     function exportSVG() {
       var svgEl = document.getElementById("graph");
-      var svgData = new XMLSerializer().serializeToString(svgEl);
+      
+      // Clone the SVG to avoid modifying the original
+      var clonedSvg = svgEl.cloneNode(true);
+      
+      // Set viewBox and dimensions
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      clonedSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clonedSvg.setAttribute("width", width);
+      clonedSvg.setAttribute("height", height);
+      clonedSvg.setAttribute("viewBox", "0 0 " + width + " " + height);
+      
+      // Create a style element with embedded font
+      var styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
+      styleEl.textContent = "@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap');" +
+        " text, tspan { font-family: 'Raleway', sans-serif; }";
+      
+      // Insert style at the beginning
+      clonedSvg.insertBefore(styleEl, clonedSvg.firstChild);
+      
+      // Get current colors for proper export
+      var isLight = document.body.classList.contains("light-mode");
+      var textColor = isLight ? "#1a1a1a" : "#f0f0f0";
+      var mutedColor = isLight ? "#888" : "#888";
+      
+      // Update CSS variables to actual colors for export
+      clonedSvg.querySelectorAll("text, tspan").forEach(function(el) {
+        var fill = el.getAttribute("fill");
+        if (fill && fill.includes("var(--text-primary)")) {
+          el.setAttribute("fill", textColor);
+        } else if (fill && fill.includes("var(--text-secondary)")) {
+          el.setAttribute("fill", isLight ? "#444" : "#ccc");
+        } else if (fill && fill.includes("var(--text-muted)")) {
+          el.setAttribute("fill", mutedColor);
+        }
+      });
+      
+      var svgData = new XMLSerializer().serializeToString(clonedSvg);
       var blob = new Blob([svgData], { type: "image/svg+xml" });
       downloadBlob(blob, "network.svg");
     }
