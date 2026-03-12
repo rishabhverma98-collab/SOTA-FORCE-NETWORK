@@ -2927,6 +2927,21 @@
         }
       });
       
+      // Apply dimmed state to nodes (inline styles for export)
+      clonedSvg.querySelectorAll("g.node.dimmed").forEach(function(el) {
+        el.setAttribute("opacity", "0.12");
+      });
+      
+      // Apply highlighted state to links
+      clonedSvg.querySelectorAll("path.link.highlighted").forEach(function(el) {
+        el.setAttribute("stroke-width", highlightedLineThickness);
+      });
+      
+      // Apply dimmed state to links
+      clonedSvg.querySelectorAll("path.link.dimmed").forEach(function(el) {
+        el.setAttribute("stroke-opacity", "0.05");
+      });
+      
       var svgData = new XMLSerializer().serializeToString(clonedSvg);
       var blob = new Blob([svgData], { type: "image/svg+xml" });
       downloadBlob(blob, "network.svg");
